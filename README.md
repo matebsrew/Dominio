@@ -1,0 +1,2 @@
+# Dominio
+Script Dominio
