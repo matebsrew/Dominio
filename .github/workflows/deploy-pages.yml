@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - claude/personal-trainer-family-app-b0z34u
   workflow_dispatch:
 
 permissions:
