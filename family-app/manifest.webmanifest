@@ -1,0 +1,15 @@
+{
+  "name": "Domínio — Treinador da Família",
+  "short_name": "Domínio",
+  "description": "Treino, alimentação, cardio e recuperação com ajuste automático, um perfil para cada pessoa da casa.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

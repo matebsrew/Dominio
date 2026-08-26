@@ -1,0 +1,259 @@
+// Nutrição: metas calculadas, registro rápido e ajuste pela evolução real.
+
+import { esc, fmt, num, toast, today, clamp, formatDate, addDays, weekDays, weekStart } from '../core/util.js';
+import { pdata, addMeal, removeMeal, setWater, nutritionDay, updateSettings } from '../core/store.js';
+import { snapshot, dayTotals, weekNutrition } from '../engine/diary.js';
+import { mealPlan, GOAL_LABEL } from '../engine/energy.js';
+import { searchFoods, portion, FOODS } from '../data/foods.js';
+import { coach, progressBar, sheet, closeSheet, field } from '../ui.js';
+import { signed } from '../core/util.js';
+
+let viewDate = today();
+
+export function render({ profile, go }) {
+  const data = pdata();
+  if (viewDate > today()) viewDate = today();
+  const snap = snapshot(profile, data, viewDate);
+  const targets = snap.targets;
+  if (!targets) {
+    return { title: 'Nutrição', html: '<div class="card">Complete altura e peso no perfil para eu calcular suas metas.</div>' };
+  }
+
+  const m = targets.macros;
+  const day = nutritionDay(viewDate);
+  const totals = dayTotals(day);
+  const plan = mealPlan(m, profile.mealsPerDay || 4, true);
+  const week = weekNutrition(data, weekDays(weekStart(viewDate)));
+
+  return {
+    title: 'Nutrição',
+    subtitle: viewDate === today() ? 'hoje' : formatDate(viewDate),
+    html: `
+      <div class="row between" style="margin-top:10px">
+        <button class="sm ghost" data-dia="-1">← ${formatDate(addDays(viewDate, -1))}</button>
+        <b>${viewDate === today() ? 'Hoje' : formatDate(viewDate)}</b>
+        <button class="sm ghost" data-dia="1" ${viewDate === today() ? 'disabled' : ''}>${formatDate(addDays(viewDate, 1))} →</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="eyebrow">Meta do dia</div>
+          <h2>${fmt(totals.kcal)} / ${fmt(m.kcal)} kcal</h2></div>
+          <span class="pill ${totals.kcal > m.kcal * 1.08 ? 'warn' : 'good'}">${signed(m.kcal - totals.kcal, 0, ' kcal')}</span></div>
+        ${progressBar(totals.kcal, m.kcal, totals.kcal > m.kcal * 1.08 ? 'warn' : '')}
+        <div class="grid-3 mt">
+          ${macroBox('Proteína', totals.protein, m.protein, 'good')}
+          ${macroBox('Carbo', totals.carbs, m.carbs, '')}
+          ${macroBox('Gordura', totals.fat, m.fat, '')}
+        </div>
+        <div class="grid-2 mt">
+          ${macroBox('Fibra', totals.fiber, m.fiber, 'good')}
+          ${macroBox('Água (ml)', totals.water, m.waterMl, '')}
+        </div>
+        <div class="row tight mt">
+          <button class="sm" data-agua="250">+250 ml</button>
+          <button class="sm" data-agua="500">+500 ml</button>
+          <button class="sm ghost" data-agua="-250">−250 ml</button>
+        </div>
+        <div class="dim tiny mt">Base: ${esc(targets.energy.method)} · gasto estimado ${fmt(targets.energy.maintenance)} kcal
+        ${data.settings.kcalOffset ? ` · ajuste acumulado ${signed(data.settings.kcalOffset, 0, ' kcal')}` : ''}
+        ${targets.energy.capped ? ' · meta limitada ao piso de segurança' : ''}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="eyebrow">Refeições</div>
+          <button class="primary sm" data-add>+ Adicionar</button></div>
+        ${day.meals.length ? day.meals.map(meal => `
+          <div class="list-item">
+            <div class="grow">
+              <b>${esc(meal.name)}</b>
+              <span class="sub">${fmt(meal.kcal)} kcal · P ${fmt(meal.protein, 1)} · C ${fmt(meal.carbs, 1)} · G ${fmt(meal.fat, 1)}</span>
+            </div>
+            <button class="sm ghost" data-remove="${meal.id}">✕</button>
+          </div>`).join('')
+          : '<p class="muted">Nenhuma refeição registrada. Use o botão acima — a busca já traz os macros prontos.</p>'}
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="eyebrow">Divisão sugerida</div>
+          <span class="pill">${profile.mealsPerDay || 4} refeições</span></div>
+        ${plan.map(p => `<div class="stat-line">
+          <span class="muted">${esc(p.name)}</span>
+          <b>${fmt(p.kcal)} kcal · ${fmt(p.protein)} g proteína</b></div>`).join('')}
+        <p class="dim tiny mt">Proteína distribuída de forma parecida entre as refeições — o estímulo à síntese proteica responde melhor assim do que concentrando tudo numa refeição só.</p>
+      </div>
+
+      ${adjustmentCard(snap, data)}
+
+      ${week ? `<div class="card">
+        <div class="eyebrow">Média da semana</div>
+        <div class="stat-line"><span class="muted">Calorias</span><b>${fmt(week.kcal)} kcal em ${week.days} dias</b></div>
+        <div class="stat-line"><span class="muted">Proteína</span><b>${fmt(week.protein)} g / dia</b></div>
+        <div class="stat-line"><span class="muted">Aderência à meta</span><b>${Math.round((week.kcal / m.kcal) * 100)}%</b></div>
+      </div>` : ''}`,
+
+    mount(root) {
+      root.querySelectorAll('[data-dia]').forEach(btn => btn.addEventListener('click', () => {
+        const next = addDays(viewDate, +btn.dataset.dia);
+        if (next > today()) return;
+        viewDate = next;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      }));
+
+      root.querySelectorAll('[data-agua]').forEach(btn => btn.addEventListener('click', () => {
+        setWater(viewDate, Math.max(0, (day.water || 0) + +btn.dataset.agua));
+      }));
+
+      root.querySelector('[data-add]')?.addEventListener('click', () => openFoodSheet(viewDate, plan));
+      root.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => {
+        removeMeal(viewDate, btn.dataset.remove);
+      }));
+
+      root.querySelector('[data-aplicar]')?.addEventListener('click', () => {
+        const delta = +root.querySelector('[data-aplicar]').dataset.aplicar;
+        updateSettings({ kcalOffset: (data.settings.kcalOffset || 0) + delta, lastAdjust: weekStart() });
+        toast('Meta calórica ajustada.');
+      });
+      root.querySelector('[data-zerar-ajuste]')?.addEventListener('click', () => {
+        updateSettings({ kcalOffset: 0, lastAdjust: null });
+        toast('Ajuste manual zerado.');
+      });
+    }
+  };
+}
+
+function macroBox(label, value, target, tone) {
+  const pct = target > 0 ? clamp((value / target) * 100, 0, 100) : 0;
+  return `<div>
+    <div class="row between tiny"><span class="muted">${esc(label)}</span><b>${fmt(value)}/${fmt(target)}</b></div>
+    ${progressBar(pct, 100, tone)}
+  </div>`;
+}
+
+function adjustmentCard(snap, data) {
+  const adj = snap.adjustment;
+  const tone = adj.status === 'ok' ? 'good' : adj.status === 'sem_dados' ? '' : 'warn';
+  return `<div class="card">
+    <div class="eyebrow">Ajuste automático</div>
+    ${coach(adj.title, adj.detail, tone)}
+    ${adj.deltaKcal ? `<button class="primary block sm" data-aplicar="${adj.deltaKcal}">Aplicar ${signed(adj.deltaKcal, 0, ' kcal/dia')}</button>` : ''}
+    ${data.settings.kcalOffset ? `<button class="link" data-zerar-ajuste>Zerar ajuste acumulado (${signed(data.settings.kcalOffset, 0, ' kcal')})</button>` : ''}
+    <p class="dim tiny mt">O ajuste compara a média de peso das últimas semanas com o ritmo-alvo do seu objetivo e converte a diferença em calorias (7700 kcal ≈ 1 kg), com limite de 250 kcal por vez.</p>
+  </div>`;
+}
+
+/* ---------- Registro de refeição ---------- */
+
+function openFoodSheet(date, plan) {
+  const state = { food: null, amount: 100, useUnit: false, mealName: plan[0]?.name || 'Refeição' };
+
+  const listHtml = term => searchFoods(term).slice(0, 40).map(f => `
+    <button class="block" style="justify-content:space-between;margin:6px 0" data-food="${esc(f.name)}">
+      <span style="text-align:left"><b>${esc(f.name)}</b><br><span class="dim tiny">${f.kcal} kcal · P ${f.p} · C ${f.c} · G ${f.f} (100 g)</span></span>
+    </button>`).join('');
+
+  sheet(`
+    <h2>Adicionar refeição</h2>
+    <div id="foodStep">
+      ${field('Refeição', `<select name="mealName">${plan.map(p => `<option>${esc(p.name)}</option>`).join('')}<option>Extra</option></select>`)}
+      ${field('Buscar alimento', '<input name="q" placeholder="frango, arroz, whey..." autocomplete="off">')}
+      <div id="foodList" style="max-height:44vh;overflow:auto">${listHtml('')}</div>
+      <button class="ghost block mt" data-manual>Registrar manualmente (kcal e macros)</button>
+    </div>`, {
+    onMount(sheetEl) {
+      const q = sheetEl.querySelector('[name="q"]');
+      const list = sheetEl.querySelector('#foodList');
+      const mealSelect = sheetEl.querySelector('[name="mealName"]');
+      mealSelect.addEventListener('change', () => { state.mealName = mealSelect.value; });
+
+      const bindFoods = () => list.querySelectorAll('[data-food]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.food = FOODS.find(f => f.name === btn.dataset.food);
+          state.useUnit = !!state.food.unit;
+          state.amount = state.useUnit ? 1 : 100;
+          renderAmount(sheetEl, state, date);
+        });
+      });
+      bindFoods();
+
+      q.addEventListener('input', () => { list.innerHTML = listHtml(q.value); bindFoods(); });
+      sheetEl.querySelector('[data-manual]').addEventListener('click', () => renderManual(sheetEl, state, date));
+    }
+  });
+}
+
+function renderAmount(sheetEl, state, date) {
+  const f = state.food;
+  const step = sheetEl.querySelector('#foodStep');
+  const draw = () => {
+    const p = portion(f, state.amount, state.useUnit);
+    step.innerHTML = `
+      <button class="link" data-voltar>← trocar alimento</button>
+      <h3>${esc(f.name)}</h3>
+      ${f.unit ? `<div class="chips mb">
+        <button class="chip sm ${state.useUnit ? 'on' : ''}" data-modo="unit">${esc(f.unit.label)}</button>
+        <button class="chip sm ${state.useUnit ? '' : 'on'}" data-modo="g">gramas</button>
+      </div>` : ''}
+      ${field(state.useUnit ? `Quantidade (${esc(f.unit.label)})` : 'Quantidade (g)',
+        `<input type="number" inputmode="decimal" name="amount" value="${state.amount}" step="${state.useUnit ? 0.5 : 10}" min="0">`)}
+      <div class="metrics mb">
+        <div class="metric"><b>${p.kcal}</b><span>kcal</span></div>
+        <div class="metric"><b>${p.protein}</b><span>proteína</span></div>
+        <div class="metric"><b>${p.carbs}</b><span>carbo</span></div>
+      </div>
+      <button class="primary block" data-confirmar>Adicionar em ${esc(state.mealName)}</button>`;
+
+    step.querySelector('[data-voltar]').addEventListener('click', () => { closeSheet(); });
+    step.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
+      state.useUnit = b.dataset.modo === 'unit';
+      state.amount = state.useUnit ? 1 : 100;
+      draw();
+    }));
+    step.querySelector('[name="amount"]').addEventListener('input', e => {
+      state.amount = num(e.target.value) ?? 0;
+      const np = portion(f, state.amount, state.useUnit);
+      const metrics = step.querySelectorAll('.metric b');
+      metrics[0].textContent = np.kcal;
+      metrics[1].textContent = np.protein;
+      metrics[2].textContent = np.carbs;
+    });
+    step.querySelector('[data-confirmar]').addEventListener('click', () => {
+      const final = portion(f, state.amount, state.useUnit);
+      addMeal(date, {
+        name: `${state.mealName} · ${f.name} ${state.useUnit ? `${state.amount} ${f.unit.label}` : `${final.grams} g`}`,
+        ...final
+      });
+      closeSheet();
+      toast('Refeição registrada.');
+    });
+  };
+  draw();
+}
+
+function renderManual(sheetEl, state, date) {
+  const step = sheetEl.querySelector('#foodStep');
+  step.innerHTML = `
+    <h3>Registro manual</h3>
+    ${field('Descrição', `<input name="name" placeholder="Marmita do almoço" value="${esc(state.mealName)}">`)}
+    <div class="grid-2">
+      ${field('Calorias', '<input type="number" inputmode="numeric" name="kcal" placeholder="600">')}
+      ${field('Proteína (g)', '<input type="number" inputmode="decimal" name="protein" placeholder="40">')}
+    </div>
+    <div class="grid-2">
+      ${field('Carboidrato (g)', '<input type="number" inputmode="decimal" name="carbs" placeholder="60">')}
+      ${field('Gordura (g)', '<input type="number" inputmode="decimal" name="fat" placeholder="18">')}
+    </div>
+    ${field('Fibra (g) — opcional', '<input type="number" inputmode="decimal" name="fiber" placeholder="6">')}
+    <button class="primary block" data-salvar>Adicionar</button>`;
+
+  step.querySelector('[data-salvar]').addEventListener('click', () => {
+    const get = n => num(step.querySelector(`[name="${n}"]`).value) ?? 0;
+    const name = step.querySelector('[name="name"]').value.trim() || 'Refeição';
+    let kcal = get('kcal');
+    const protein = get('protein'), carbs = get('carbs'), fat = get('fat');
+    if (!kcal) kcal = Math.round(protein * 4 + carbs * 4 + fat * 9);
+    if (!kcal) return toast('Informe as calorias ou os macros.');
+    addMeal(date, { name, kcal, protein, carbs, fat, fiber: get('fiber') });
+    closeSheet();
+    toast('Refeição registrada.');
+  });
+}
