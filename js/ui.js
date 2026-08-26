@@ -8,6 +8,7 @@ export const ICONS = {
   nutricao: '<path d="M5 3v8a3 3 0 0 0 6 0V3M8 11v10"/><path d="M17 3c-1.5 2-2 4-2 6s.5 3 2 3 2-1 2-3-.5-4-2-6ZM17 12v9"/>',
   atividade: '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
   corpo: '<circle cx="12" cy="5" r="2.4"/><path d="M12 8v7M8 10l4 1 4-1M9 21l3-6 3 6"/>',
+  semana: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18M8 14h3M8 17h6"/>',
   voltar: '<path d="m15 5-7 7 7 7"/>',
   mais: '<path d="M12 5v14M5 12h14"/>'
 };
@@ -21,7 +22,8 @@ export const TABS = [
   { href: '#/treino', label: 'Treino', icon: 'treino' },
   { href: '#/nutricao', label: 'Comida', icon: 'nutricao' },
   { href: '#/atividade', label: 'Cardio', icon: 'atividade' },
-  { href: '#/corpo', label: 'Corpo', icon: 'corpo' }
+  { href: '#/corpo', label: 'Corpo', icon: 'corpo' },
+  { href: '#/semana', label: 'Semana', icon: 'semana' }
 ];
 
 export function tabbar(current) {
@@ -56,7 +58,7 @@ export function empty(emoji, title, message, actionHtml = '') {
 /* ---------- Bottom sheet ---------- */
 
 export function sheet(html, { onMount, onClose } = {}) {
-  closeSheet();
+  closeSheet(true);
   const backdrop = document.createElement('div');
   backdrop.className = 'sheet-backdrop';
   backdrop.innerHTML = `<div class="sheet"><div class="sheet-grip"></div>${html}</div>`;
@@ -70,9 +72,13 @@ export function sheet(html, { onMount, onClose } = {}) {
   return backdrop;
 }
 
-export function closeSheet() {
+// Ao fechar, a tela por baixo é redesenhada: o que foi salvo dentro do painel
+// (refeição, feedback, perfil) aparece na hora.
+export function closeSheet(silent = false) {
+  const existed = document.querySelectorAll('.sheet-backdrop').length > 0;
   document.querySelectorAll('.sheet-backdrop').forEach(el => el.remove());
   document.body.style.overflow = '';
+  if (existed && !silent) window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 export function confirmSheet(title, message, confirmLabel = 'Confirmar') {

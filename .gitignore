@@ -1,0 +1,5 @@
+# Skills instaladas via `npx skills add` — material de referência de terceiros,
+# usado para escrever o app. Não faz parte do site publicado.
+.agents/
+.claude/skills/
+node_modules/

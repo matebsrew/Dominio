@@ -99,8 +99,15 @@ export function tdee(profile, body = {}, cardioMinWeek = 0) {
 // Ritmo-alvo de mudança de peso, em % do peso corporal por semana.
 export function targetRate(profile) {
   const exp = profile.experience || 'intermediario';
+  const bmi = profile.heightCm && profile.weightKg
+    ? profile.weightKg / ((profile.heightCm / 100) ** 2)
+    : null;
+  // Quem está abaixo do peso tem margem para ganhar mais rápido sem acumular gordura.
+  const underweight = bmi !== null && bmi < 19;
+
   switch (profile.goal) {
     case 'hipertrofia':
+      if (underweight) return exp === 'avancado' ? 0.25 : 0.5;
       return exp === 'iniciante' ? 0.4 : exp === 'intermediario' ? 0.25 : 0.12;
     case 'forca':
       return exp === 'avancado' ? 0.1 : 0.2;
@@ -209,6 +216,40 @@ export function mealPlan(macroTargets, mealsPerDay = 4, hasTraining = true) {
       fat: Math.round(macroTargets.fat * (isPeri ? share * 0.6 : share))
     };
   });
+}
+
+/**
+ * Ciclagem simples: dia de treino recebe mais carboidrato, dia de descanso
+ * menos, mantendo a MÉDIA da semana igual à meta. O carboidrato é o macro que
+ * mais rende perto do treino; a proteína fica constante todos os dias.
+ */
+export function cycledTargets(base, profile, isTrainingDay) {
+  const days = clamp(profile.daysPerWeek || 3, 1, 6);
+  const rest = 7 - days;
+  const boost = 0.15;                       // +15% de carbo no dia de treino
+  if (rest === 0) return { ...base, cycle: 'sem ciclagem' };
+
+  const extraCarbs = base.carbs * boost;
+  const carbs = isTrainingDay
+    ? Math.round(base.carbs + extraCarbs)
+    : Math.round(base.carbs - (extraCarbs * days) / rest);
+
+  const kcal = Math.round(base.protein * 4 + carbs * 4 + base.fat * 9);
+  return {
+    ...base,
+    carbs: Math.max(50, carbs),
+    kcal,
+    cycle: isTrainingDay ? 'dia de treino' : 'dia de descanso',
+    cycleNote: isTrainingDay
+      ? 'Dia de treino: mais carboidrato, concentrado nas refeições em volta da sessão.'
+      : 'Dia de descanso: menos carboidrato, mesma proteína. A média da semana continua igual à meta.'
+  };
+}
+
+// Distribuição da proteína por refeição: entre 1/8 e 1/4 do total diário
+// é a faixa que o corpo aproveita para síntese muscular.
+export function proteinPerMealRange(totalProtein) {
+  return { min: Math.round(totalProtein / 8), max: Math.round(totalProtein / 4) };
 }
 
 export function bmiInfo(weight, heightCm) {

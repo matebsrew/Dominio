@@ -14,6 +14,7 @@ import * as activityView from './views/activity.js';
 import * as bodyView from './views/body.js';
 import * as historyView from './views/history.js';
 import * as settingsView from './views/settings.js';
+import * as weekView from './views/week.js';
 
 const ROUTES = {
   perfis: profilesView,
@@ -25,7 +26,8 @@ const ROUTES = {
   atividade: activityView,
   corpo: bodyView,
   historico: historyView,
-  ajustes: settingsView
+  ajustes: settingsView,
+  semana: weekView
 };
 
 export function go(path) {
@@ -44,8 +46,8 @@ async function render() {
   const state = getState();
   const { name, params } = parseRoute();
 
-  // Sem perfil algum: manda direto para a criação.
-  if (!state.profiles.length && name !== 'novo') return go('/novo');
+  // Sem perfil algum: tela de perfis, que oferece criar um a um ou a família inteira.
+  if (!state.profiles.length && !['novo', 'perfis'].includes(name)) return go('/perfis');
   // Perfil não escolhido ainda.
   if (state.profiles.length && !state.activeProfileId && !['perfis', 'novo'].includes(name)) return go('/perfis');
   if (!name) return go(state.activeProfileId ? '/hoje' : '/perfis');

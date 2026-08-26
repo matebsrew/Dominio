@@ -1,10 +1,13 @@
 // Treino: check-in, sessão do dia e visão do programa da semana.
 
 import { esc, today, weekdayIndex, WEEKDAYS_SHORT, num, toast, bars, weekStart, addDays } from '../core/util.js';
-import { pdata, saveCheckin, checkinFor, deleteCheckin, setProgram, activeProfile } from '../core/store.js';
+import { pdata, saveCheckin, checkinFor, deleteCheckin, setProgram, activeProfile, setPain } from '../core/store.js';
 import { generateProgram, dayForWeekday, nextDay, weekMap, estimateMinutes } from '../engine/program.js';
 import { suggest, volumeReport } from '../engine/progression.js';
 import { QUESTIONS, score as readinessScore, sessionPlan, band } from '../engine/readiness.js';
+import { phase, setsThisWeek, deloadPrescription } from '../engine/mesocycle.js';
+import { estimateLoad, warmupFor } from '../engine/loading.js';
+import { REGIONS, PAIN_ADVICE, conflictsWith, saferAlternatives, stressOf } from '../data/joints.js';
 import { BY_ID } from '../data/exercises.js';
 import { guideHtml, bindGuides } from '../components/guide.js';
 import { coach, scaleInput, bindScales, field, sheet, closeSheet, confirmSheet } from '../ui.js';
@@ -37,21 +40,36 @@ export function render({ profile, go, params }) {
   const checkin = checkinFor(today());
   const plan = sessionPlan(checkin || draftCheckin, { sleepHours: checkin?.sleepHours, pain: checkin?.pain });
   const trainedToday = data.sessions.some(s => s.date === today() && s.day === day.name);
-  const isDeload = !!data.settings.deloadUntil && data.settings.deloadUntil >= today();
+  const ph = phase(profile, data.settings);
+  const isDeload = ph.isDeload;
+  const pain = data.settings.pain || {};
+  const painRegions = Object.keys(pain).filter(r => pain[r]);
+  const warmup = warmupFor(day.name);
 
   return {
     title: esc(day.name),
     subtitle: scheduled ? 'treino de hoje' : 'próximo treino da rotação',
     html: `
-      ${checkin ? checkinDone(checkin, plan) : checkinForm()}
+      ${checkin ? checkinDone(checkin, plan) : checkinForm(pain)}
+      ${painRegions.length ? painCard(painRegions, day, profile) : ''}
       ${trainedToday ? coach('Treino de hoje já registrado', 'Você pode abrir de novo para adicionar séries — o histórico soma tudo do dia.', 'good') : ''}
       <div class="card">
         <div class="card-head">
-          <div><div class="eyebrow">Sessão</div><h2>${esc(day.name)}</h2>
-            <div class="muted tiny">${day.exercises.length} exercícios · ~${day.estimatedMin || estimateMinutes(day.exercises)} min${isDeload ? ' · semana de deload' : ''}</div></div>
+          <div><div class="eyebrow">Sessão · ${esc(ph.label)}</div><h2>${esc(day.name)}</h2>
+            <div class="muted tiny">${day.exercises.length} exercícios · ~${day.estimatedMin || estimateMinutes(day.exercises)} min · RIR-alvo ${esc(ph.rir.label)}</div></div>
         </div>
-        ${day.exercises.map(ex => previewExercise(ex, data, plan, isDeload)).join('')}
+        ${isDeload ? coach('Protocolo de hoje', deloadPrescription(data.settings).text, 'violet') : ''}
+        ${day.exercises.map(ex => previewExercise(ex, data, plan, ph, profile, pain)).join('')}
         <button class="primary block mt" data-iniciar>${trainedToday ? 'Abrir sessão novamente' : 'Iniciar treino'}</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="eyebrow">Antes de começar</div><h2>${esc(warmup.title)}</h2></div>
+          <span class="pill">${warmup.minutes} min</span></div>
+        <ul class="muted" style="margin:6px 0;padding-left:20px;line-height:1.6">
+          ${warmup.items.map(i => `<li>${esc(i)}</li>`).join('')}
+        </ul>
+        <p class="dim tiny">Aquecer não é alongar: é subir temperatura, lubrificar a articulação e ensaiar o padrão do movimento. As séries de aproximação de cada exercício aparecem dentro da sessão.</p>
       </div>
 
       ${volumeCard(data, profile)}
@@ -68,6 +86,16 @@ export function render({ profile, go, params }) {
     mount(root) {
       bindGuides(root);
 
+      root.querySelector('[data-pain]')?.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-region]');
+        if (btn) btn.classList.toggle('on');
+      });
+
+      root.querySelector('[data-limpar-dor]')?.addEventListener('click', () => {
+        setPain({});
+        toast('Dor removida. Os exercícios originais voltam.');
+      });
+
       bindScales(root, (key, value) => {
         draftCheckin[key] = value;
         const preview = root.querySelector('[data-preview-score]');
@@ -81,8 +109,10 @@ export function render({ profile, go, params }) {
         const answered = QUESTIONS.filter(q => Number.isFinite(draftCheckin[q.key])).length;
         if (answered < QUESTIONS.length) return toast('Responda as quatro perguntas.');
         const sleepHours = num(root.querySelector('[name="sleepHours"]')?.value);
-        const pain = root.querySelector('[name="pain"]')?.checked || false;
-        saveCheckin({ ...draftCheckin, sleepHours, pain, score: readinessScore(draftCheckin) });
+        const regions = {};
+        root.querySelectorAll('[data-pain] button.on').forEach(b => { regions[b.dataset.region] = true; });
+        setPain(regions);
+        saveCheckin({ ...draftCheckin, sleepHours, pain: Object.keys(regions).length > 0, painRegions: Object.keys(regions), score: readinessScore(draftCheckin) });
         draftCheckin = {};
         toast('Check-in salvo.');
       });
@@ -106,7 +136,7 @@ export function render({ profile, go, params }) {
   };
 }
 
-function checkinForm() {
+function checkinForm(pain = {}) {
   const s = readinessScore(draftCheckin);
   return `<div class="card">
     <div class="card-head"><div><div class="eyebrow">Antes de treinar</div><h2>Como você está hoje?</h2></div>
@@ -118,10 +148,16 @@ function checkinForm() {
       </div>`).join('')}
     <div class="grid-2">
       ${field('Horas de sono (opcional)', '<input type="number" inputmode="decimal" name="sleepHours" step="0.5" min="0" max="14" placeholder="7,5">')}
-      <div class="field"><label>Dor articular?</label>
-        <label class="row" style="gap:8px;font-size:14px;color:var(--text);font-weight:600">
-          <input type="checkbox" name="pain" style="width:20px;height:20px"> Sim, algo dói
-        </label></div>
+      <div class="field"><label>Prontidão</label>
+        <div class="muted tiny">Some as respostas acima automaticamente.</div></div>
+    </div>
+    <div class="field">
+      <label>Alguma articulação incomodando? (opcional)</label>
+      <div class="chips" data-pain>
+        ${Object.entries(REGIONS).map(([key, label]) =>
+          `<button type="button" class="chip sm ${pain[key] ? 'on' : ''}" data-region="${key}">${esc(label)}</button>`).join('')}
+      </div>
+      <div class="hint">Marcando, eu troco automaticamente os exercícios que passam por essa articulação.</div>
     </div>
     <button class="primary block" data-salvar-checkin>Salvar check-in</button>
   </div>`;
@@ -137,21 +173,51 @@ function checkinDone(checkin, plan) {
   </div>`;
 }
 
-function previewExercise(ex, data, plan, isDeload) {
+function previewExercise(ex, data, plan, ph, profile, pain) {
   const meta = BY_ID[ex.id] || ex;
-  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: isDeload });
-  const sets = Math.max(1, Math.round(ex.sets * (plan.volumeFactor ?? 1)));
+  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload });
+  const bias = data.settings.volumeBias?.[ex.primary] || 0;
+  const planned = setsThisWeek(ex.sets, ph, bias);
+  const sets = Math.max(1, Math.round(planned * (plan.volumeFactor ?? 1)));
+  const conflicts = conflictsWith(ex.id, pain);
+  const estimate = s.kind === 'primeira' ? estimateLoad(ex.id, profile) : null;
+
   return `<div class="card flat tight" style="margin:10px 0">
     <div class="row between">
       <div style="min-width:0">
         <b>${esc(ex.name)}</b>
-        <div class="muted tiny">${sets} séries · ${ex.reps[0]}–${ex.reps[1]} reps · RIR ${s.targetRir} · descanso ${Math.round((ex.rest || 120) / 60)} min</div>
+        <div class="muted tiny">${sets} séries · ${ex.reps[0]}–${ex.reps[1]} reps · RIR ${esc(ph.isDeload ? ph.rir.label : s.targetRir)} · descanso ${Math.round((ex.rest || 120) / 60)} min</div>
       </div>
-      ${s.suggestedKg ? `<span class="pill ${s.kind === 'subir' ? 'good' : s.kind === 'reduzir' ? 'warn' : ''}">${s.suggestedKg} kg</span>` : ''}
+      ${s.suggestedKg ? `<span class="pill ${s.kind === 'subir' ? 'good' : s.kind === 'reduzir' ? 'warn' : ''}">${s.suggestedKg} kg</span>`
+        : estimate && !estimate.bodyweight ? `<span class="pill">${estimate.kg} kg${estimate.perSide ? '/lado' : ''}</span>` : ''}
     </div>
     <div class="muted tiny mt">${esc(s.headline)}</div>
+    ${estimate ? `<div class="dim tiny mt">${esc(estimate.text)} ${esc(estimate.caveat || '')}</div>` : ''}
+    ${conflicts.length ? `<div class="tiny mt" style="color:var(--warn)">⚠ Passa pelo ${conflicts.map(c => REGIONS[c].toLowerCase()).join(' e ')} que você marcou como dolorido — troque na sessão.</div>` : ''}
     <button class="link" data-toggle-guide="${esc(ex.id)}">📘 Como executar</button>
     ${guideHtml(ex.id)}
+  </div>`;
+}
+
+function painCard(regions, day, profile) {
+  const affected = day.exercises
+    .map(ex => ({ ex, conflicts: conflictsWith(ex.id, Object.fromEntries(regions.map(r => [r, true]))) }))
+    .filter(x => x.conflicts.length);
+
+  return `<div class="card">
+    <div class="card-head"><div><div class="eyebrow">Dor registrada</div>
+      <h2>${regions.map(r => REGIONS[r]).join(' e ')}</h2></div>
+      <button class="sm ghost" data-limpar-dor>já passou</button></div>
+    ${regions.map(r => coach(REGIONS[r], PAIN_ADVICE[r], 'warn')).join('')}
+    ${affected.length ? `<div class="mt"><div class="eyebrow mb">Exercícios de hoje afetados</div>
+      ${affected.map(({ ex }) => {
+        const alts = saferAlternatives(ex.id, Object.fromEntries(regions.map(r => [r, true])), profile.equipment);
+        return `<div class="stat-line"><div><b>${esc(ex.name)}</b>
+          <div class="dim tiny">Trocar por: ${alts.length ? alts.slice(0, 2).map(a => esc(a.name) + (a.relief === 'parcial' ? ' (alívio parcial)' : '')).join(' ou ') : 'nenhuma alternativa cadastrada — reduza carga e amplitude'}</div>
+        </div></div>`;
+      }).join('')}
+      <p class="dim tiny mt">A troca é feita dentro da sessão, no botão "trocar" de cada exercício.</p></div>` : ''}
+    <p class="dim tiny mt">Dor que passa de duas semanas, dor com inchaço ou que impede movimentos do dia a dia merece avaliação de um profissional. Este app não diagnostica nada.</p>
   </div>`;
 }
 

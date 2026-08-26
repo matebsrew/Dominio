@@ -1,9 +1,13 @@
 // Nutrição: metas calculadas, registro rápido e ajuste pela evolução real.
 
 import { esc, fmt, num, toast, today, clamp, formatDate, addDays, weekDays, weekStart } from '../core/util.js';
-import { pdata, addMeal, removeMeal, setWater, nutritionDay, updateSettings } from '../core/store.js';
+import { pdata, addMeal, removeMeal, setWater, nutritionDay, updateSettings, saveFavoriteMeal, removeFavoriteMeal } from '../core/store.js';
 import { snapshot, dayTotals, weekNutrition } from '../engine/diary.js';
-import { mealPlan, GOAL_LABEL } from '../engine/energy.js';
+import { mealPlan, GOAL_LABEL, cycledTargets, proteinPerMealRange } from '../engine/energy.js';
+import { suggestions } from '../engine/mealSuggest.js';
+import { supplementsFor } from '../data/supplements.js';
+import { dayForWeekday } from '../engine/program.js';
+import { weekdayIndex } from '../core/util.js';
 import { searchFoods, portion, FOODS } from '../data/foods.js';
 import { coach, progressBar, sheet, closeSheet, field } from '../ui.js';
 import { signed } from '../core/util.js';
@@ -19,11 +23,22 @@ export function render({ profile, go }) {
     return { title: 'Nutrição', html: '<div class="card">Complete altura e peso no perfil para eu calcular suas metas.</div>' };
   }
 
-  const m = targets.macros;
+  const isTrainingDay = !!dayForWeekday(data.program, weekdayIndex(viewDate))
+    || data.sessions.some(s => s.date === viewDate);
+  const m = cycledTargets(targets.macros, profile, isTrainingDay);
   const day = nutritionDay(viewDate);
   const totals = dayTotals(day);
-  const plan = mealPlan(m, profile.mealsPerDay || 4, true);
+  const plan = mealPlan(m, profile.mealsPerDay || 4, isTrainingDay);
   const week = weekNutrition(data, weekDays(weekStart(viewDate)));
+  const remaining = {
+    kcal: Math.max(0, m.kcal - totals.kcal),
+    protein: Math.max(0, m.protein - totals.protein),
+    carbs: Math.max(0, m.carbs - totals.carbs),
+    fat: Math.max(0, m.fat - totals.fat)
+  };
+  const ideas = suggestions(remaining, profile);
+  const favorites = data.settings.favorites || [];
+  const perMeal = proteinPerMealRange(m.protein);
 
   return {
     title: 'Nutrição',
@@ -36,7 +51,7 @@ export function render({ profile, go }) {
       </div>
 
       <div class="card">
-        <div class="card-head"><div><div class="eyebrow">Meta do dia</div>
+        <div class="card-head"><div><div class="eyebrow">Meta do dia · ${esc(m.cycle || '')}</div>
           <h2>${fmt(totals.kcal)} / ${fmt(m.kcal)} kcal</h2></div>
           <span class="pill ${totals.kcal > m.kcal * 1.08 ? 'warn' : 'good'}">${signed(m.kcal - totals.kcal, 0, ' kcal')}</span></div>
         ${progressBar(totals.kcal, m.kcal, totals.kcal > m.kcal * 1.08 ? 'warn' : '')}
@@ -54,10 +69,19 @@ export function render({ profile, go }) {
           <button class="sm" data-agua="500">+500 ml</button>
           <button class="sm ghost" data-agua="-250">−250 ml</button>
         </div>
+        ${m.cycleNote ? `<div class="dim tiny mt">${esc(m.cycleNote)}</div>` : ''}
         <div class="dim tiny mt">Base: ${esc(targets.energy.method)} · gasto estimado ${fmt(targets.energy.maintenance)} kcal
         ${data.settings.kcalOffset ? ` · ajuste acumulado ${signed(data.settings.kcalOffset, 0, ' kcal')}` : ''}
         ${targets.energy.capped ? ' · meta limitada ao piso de segurança' : ''}</div>
       </div>
+
+      ${favorites.length ? `<div class="card tight">
+        <div class="eyebrow mb">Rápido</div>
+        <div class="chips">
+          ${favorites.slice(0, 8).map(f => `<button class="chip sm" data-fav="${esc(f.id)}">${esc(f.name)} · ${fmt(f.kcal)}</button>`).join('')}
+        </div>
+        <div class="dim tiny mt">Toque para repetir. Segure a lista em Ajustes para remover.</div>
+      </div>` : ''}
 
       <div class="card">
         <div class="card-head"><div class="eyebrow">Refeições</div>
@@ -68,6 +92,7 @@ export function render({ profile, go }) {
               <b>${esc(meal.name)}</b>
               <span class="sub">${fmt(meal.kcal)} kcal · P ${fmt(meal.protein, 1)} · C ${fmt(meal.carbs, 1)} · G ${fmt(meal.fat, 1)}</span>
             </div>
+            <button class="sm ghost" data-favoritar="${meal.id}" title="Salvar como favorito">★</button>
             <button class="sm ghost" data-remove="${meal.id}">✕</button>
           </div>`).join('')
           : '<p class="muted">Nenhuma refeição registrada. Use o botão acima — a busca já traz os macros prontos.</p>'}
@@ -79,10 +104,34 @@ export function render({ profile, go }) {
         ${plan.map(p => `<div class="stat-line">
           <span class="muted">${esc(p.name)}</span>
           <b>${fmt(p.kcal)} kcal · ${fmt(p.protein)} g proteína</b></div>`).join('')}
-        <p class="dim tiny mt">Proteína distribuída de forma parecida entre as refeições — o estímulo à síntese proteica responde melhor assim do que concentrando tudo numa refeição só.</p>
+        <p class="dim tiny mt">O corpo aproveita entre ${perMeal.min} g e ${perMeal.max} g de proteína por refeição para construir músculo — daí a distribuição parecida em vez de tudo numa refeição só.
+        ${isTrainingDay ? 'Concentre o carboidrato nas refeições antes e depois do treino: é onde ele rende mais.' : ''}</p>
       </div>
 
+      ${ideas.length ? `<div class="card">
+        <div class="card-head"><div><div class="eyebrow">Para fechar o dia</div>
+          <h2>Faltam ${fmt(remaining.kcal)} kcal e ${fmt(remaining.protein)} g de proteína</h2></div></div>
+        ${ideas.map(i => `<div class="card flat tight">
+          <b>${esc(i.label)}</b>
+          <div class="dim tiny">${i.items.map(x => `${esc(x.name)} ${x.grams} g`).join(' · ')}</div>
+          <div class="muted tiny mt">${fmt(i.total.kcal)} kcal · P ${i.total.protein} · C ${i.total.carbs} · G ${i.total.fat}</div>
+          <button class="sm mt" data-ideia="${esc(i.label)}">Registrar isso</button>
+        </div>`).join('')}
+      </div>` : ''}
+
       ${adjustmentCard(snap, data)}
+
+      <div class="card">
+        <div class="card-head"><div><div class="eyebrow">Suplementos</div>
+          <h2>O que vale para o seu objetivo</h2></div></div>
+        ${supplementsFor(profile).map(sup => `<div class="card flat tight">
+          <div class="row between"><b>${esc(sup.name)}</b><span class="pill">${esc(sup.dose)}</span></div>
+          <div class="muted tiny mt">${esc(sup.why)}</div>
+          <div class="dim tiny mt">${esc(sup.how)}</div>
+          ${sup.note ? `<div class="tiny mt" style="color:var(--warn)">${esc(sup.note)}</div>` : ''}
+        </div>`).join('')}
+        <p class="dim tiny mt">O que não está nesta lista provavelmente não muda nada. Suplemento resolve, na melhor das hipóteses, os últimos poucos por cento — depois de treino, comida e sono estarem no lugar.</p>
+      </div>
 
       ${week ? `<div class="card">
         <div class="eyebrow">Média da semana</div>
@@ -104,6 +153,29 @@ export function render({ profile, go }) {
       }));
 
       root.querySelector('[data-add]')?.addEventListener('click', () => openFoodSheet(viewDate, plan));
+
+      root.querySelectorAll('[data-fav]').forEach(btn => btn.addEventListener('click', () => {
+        const fav = favorites.find(f => f.id === btn.dataset.fav);
+        if (!fav) return;
+        const { id, ...meal } = fav;
+        addMeal(viewDate, meal);
+        toast('Refeição repetida.');
+      }));
+
+      root.querySelectorAll('[data-favoritar]').forEach(btn => btn.addEventListener('click', () => {
+        const meal = day.meals.find(x => x.id === btn.dataset.favoritar);
+        if (!meal) return;
+        const { id, ts, ...rest } = meal;
+        saveFavoriteMeal(rest);
+        toast('Salvo nos favoritos.');
+      }));
+
+      root.querySelectorAll('[data-ideia]').forEach(btn => btn.addEventListener('click', () => {
+        const idea = ideas.find(i => i.label === btn.dataset.ideia);
+        if (!idea) return;
+        addMeal(viewDate, { name: idea.label, ...idea.total });
+        toast('Registrado.');
+      }));
       root.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => {
         removeMeal(viewDate, btn.dataset.remove);
       }));

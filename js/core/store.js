@@ -13,10 +13,14 @@ function emptyProfileData() {
     sessions: [],      // treinos concluídos
     checkins: [],      // check-ins de prontidão
     body: [],          // peso, bioimpedância e medidas
+    feedback: [],      // RSM pós-treino por músculo
     nutrition: {},     // dateKey -> { meals: [], water, notes }
     activity: {},      // dateKey -> { steps, cardio: [] }
     program: null,     // programa gerado
-    settings: { kcalOffset: 0, mesoWeek: 1, weekTag: null, deloadUntil: null, lastAdjust: null }
+    settings: {
+      kcalOffset: 0, mesoWeek: 1, weekTag: null, deloadUntil: null, deloadStart: null,
+      lastAdjust: null, volumeBias: {}, pain: {}, favorites: []
+    }
   };
 }
 
@@ -205,6 +209,41 @@ export function addCardio(date, entry) {
 export function removeCardio(date, id) {
   const day = activityDay(date);
   day.cardio = day.cardio.filter(c => c.id !== id);
+  persist();
+}
+
+export function saveFeedback(entry) {
+  const d = pdata();
+  d.feedback = (d.feedback || []).filter(f => !(f.date === entry.date && f.muscle === entry.muscle));
+  d.feedback.push({ ...entry, ts: Date.now() });
+  d.feedback.sort((a, b) => (a.date < b.date ? 1 : -1));
+  persist();
+}
+
+export function applyVolumeBias(map) {
+  const d = pdata();
+  d.settings.volumeBias = { ...(d.settings.volumeBias || {}), ...map };
+  persist();
+}
+
+export function setPain(regions) {
+  const d = pdata();
+  d.settings.pain = regions || {};
+  persist();
+}
+
+export function saveFavoriteMeal(meal) {
+  const d = pdata();
+  d.settings.favorites = d.settings.favorites || [];
+  if (d.settings.favorites.some(f => f.name === meal.name)) return;
+  d.settings.favorites.unshift({ ...meal, id: uid() });
+  d.settings.favorites = d.settings.favorites.slice(0, 20);
+  persist();
+}
+
+export function removeFavoriteMeal(id) {
+  const d = pdata();
+  d.settings.favorites = (d.settings.favorites || []).filter(f => f.id !== id);
   persist();
 }
 
