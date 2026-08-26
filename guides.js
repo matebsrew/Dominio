@@ -2,21 +2,21 @@
 (function(){
 'use strict';
 const IMG={
-'Supino Reto Máquina ou Barra':'./assets/supino-reto-anatomico.webp?v=11',
+'Supino Reto Máquina ou Barra':'./assets/supino-reto-guia.svg?v=12',
 'Puxada Alta Pronada (Lat Pulldown)':'https://img-new.cgtrader.com/items/5282970/f4117ec062/lat-pulldown-3d-model-f4117ec062.jpg',
-'Desenvolvimento com Halteres':'https://blog.kakaocdn.net/dna/c9ibHI/btry2mg2znr/AAAAAAAAAAAAAAAAAAAAAJtBsWQdJ-HL5fVUEU3nQEYO9UwbQDgY2e7CcKW17ENc/img.png',
+'Desenvolvimento com Halteres':'https://commons.wikimedia.org/wiki/Special:Redirect/file/Dumbbell-shoulder-press-1.png',
 'Elevação Lateral com Halteres':'https://cdn.shopify.com/s/files/1/0754/7279/8002/files/Blog-dumbbells_3.webp?v=1739252606',
 'Tríceps Testa com Barra W':'https://weighteasyloss.com/wp-content/uploads/2018/10/5.jpg',
 'Hack Squat / Agachamento no Smith':'https://i.pinimg.com/originals/07/48/fe/0748fe254287699c2e6e153ecd157a97.jpg',
 'Mesa Flexora':'https://fitliferegime.com/wp-content/uploads/2021/07/Leg-Curl-1024x576.jpg',
-'Cadeira Extensora':'https://60seconds.sport.mos.ru/upload/iblock/6f8/h9w1cyweutipoawws4bunzv32u01zo6l/%D0%A1%D1%85%D0%B5%D0%BC%D1%8B_1000%D1%851000.png',
+'Cadeira Extensora':'https://www.jefit.com/images/exercises/960_590/520.jpg',
 'Panturrilha em Pé Máquina':'https://www.liftosaur.com/externalimages/exercises/full/large/standingcalfraise_bodyweight_full_large.png',
 'Remada com Peito Apoiado / Máquina':'https://wellfitinsider.com/wp-content/uploads/2025/08/WWhat-Is-a-Chest-Supported-Row.jpg',
 'Supino Inclinado com Halteres':'https://pub-47c5c21e53814e8a8e1024b19488867f.r2.dev/2019/10/incline-dumbbell-bench-press-e1571426551412-1024x691.png',
 'Crucifixo na Máquina ou Cabo':'https://cdn.shopify.com/s/files/1/0580/4484/2041/files/Cable_Chest_Fly_Muscles_Worked.png?v=1778657320',
 'Puxada Unilateral no Cabo (cotovelo ao quadril)':'https://s3assets.skimble.com/assets/3090621/image_iphone.jpg',
 'Crucifixo Inverso Máquina ou Cabo':'https://s3.amazonaws.com/prod.skimble/assets/3027450/image_iphone.jpg',
-'Rosca Direta com Barra W':'https://blog.kakaocdn.net/dna/caftqY/btsMBTFHtxO/AAAAAAAAAAAAAAAAAAAAABLW7sS_PEC7GLdKnKOT7-dXNLPPlmGlgylIWWtBkK0H/img.png',
+'Rosca Direta com Barra W':'https://cdn.shopify.com/s/files/1/0269/5551/3900/files/EZ-Barbell-Curl_42cb566b-6415-4318-94e0-c93f4b442e59_600x600.png?v=1612137227',
 'Stiff / Levantamento Romeno (RDL)':'https://sportmenu.com/uploads/store/Texts/Text1449/1f335b.png',
 'Hip Thrust':'https://cdn.zyloai.app/exercise/images/hip-thrusts-3.webp',
 'Leg Press 45º (Foco Quadríceps)':'https://hcgym.ee/wp-content/uploads/2022/07/leg-press.jpg',
@@ -55,7 +55,7 @@ function inject(){
   const ex=arr[i];if(!ex)return;const d=INFO[ex.name]||[ex.target,'Execute com controle.','Mantenha boa técnica.','Evite dor e compensações.'];
   const btn=document.createElement('button');btn.type='button';btn.className='safeGuideBtn';btn.textContent='📘 Como executar';
   const box=document.createElement('div');box.className='safeGuide hidden';
-  const url=IMG[ex.name];box.innerHTML=`${url?`<img src="${url}" alt="${ex.name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;safeImgFail&quot;>Imagem externa indisponível. As dicas continuam abaixo.</div>'">`:''}<h4>🎯 ${d[0]}</h4><ul><li>${d[1]}</li><li>${d[2]}</li></ul><h4>Evite</h4><ul class="bad"><li>${d[3]}</li></ul>`;
+  const url=IMG[ex.name];box.innerHTML=`${url?`<img src="${url}" alt="${ex.name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<h4>🎯 ${d[0]}</h4><ul><li>${d[1]}</li><li>${d[2]}</li></ul><h4>Evite</h4><ul class="bad"><li>${d[3]}</li></ul>`;
   btn.onclick=()=>box.classList.toggle('hidden');
   const progress=card.querySelector('.progress');card.insertBefore(btn,progress);card.insertBefore(box,progress);
  });
