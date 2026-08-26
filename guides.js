@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const IMG={
-'Supino Reto Máquina ou Barra':'./assets/supino-reto-anatomico.webp?v=11',
+'Supino Reto Máquina ou Barra':'./assets/supino-reto-guia.svg?v=12',
 'Puxada Alta Pronada (Lat Pulldown)':'https://img-new.cgtrader.com/items/5282970/f4117ec062/lat-pulldown-3d-model-f4117ec062.jpg',
 'Desenvolvimento com Halteres':'https://commons.wikimedia.org/wiki/Special:Redirect/file/Dumbbell-shoulder-press-1.png',
 'Elevação Lateral com Halteres':'https://cdn.shopify.com/s/files/1/0754/7279/8002/files/Blog-dumbbells_3.webp?v=1739252606',
