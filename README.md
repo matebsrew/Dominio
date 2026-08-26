@@ -1,9 +1,27 @@
-# Domínio — treinador da família
+# Domínio
 
-App web (PWA) para treino, alimentação, cardio e recuperação, com **um perfil separado para cada pessoa da casa**.
-Não é uma ficha digital: o app lê o que você registra e responde — sugere carga, ajusta calorias e segura o treino quando a recuperação não está boa.
+Treinador da casa. App web (PWA) para treino, alimentação, cardio e recuperação, com **um perfil
+separado para cada pessoa** — Matheus, Thais, Leandro e Priscila.
 
-Tudo fica salvo **no próprio aparelho**. Sem conta, sem servidor, sem nuvem.
+Não é uma ficha digital: o app lê o que você registra e responde — periodiza o treino, sugere carga,
+ajusta calorias e segura a sessão quando a recuperação não está boa.
+
+## Acesso e privacidade
+
+Tudo fica **cifrado no próprio aparelho**. Sem conta, sem servidor, sem nuvem.
+
+Na primeira abertura, a casa escolhe uma **frase de acesso**. Ela abre o app e é a chave que cifra
+todos os dados gravados ali (AES-GCM, chave derivada por PBKDF2 com 250 mil iterações). Quem abrir o
+endereço sem a frase encontra um app vazio, e o conteúdo gravado no aparelho é ilegível.
+
+Duas coisas ditas com clareza, porque importam:
+
+- O **endereço é público** — não existe como esconder um site estático. O que protege vocês é a cifra,
+  não o segredo do link.
+- **Sem a frase não há recuperação.** Ninguém consegue reabrir os dados, eu inclusive. Anote em lugar
+  seguro e exporte um backup de vez em quando (o backup sai sem cifra, para abrir em qualquer aparelho).
+
+O app tranca sozinho depois de 15 minutos fechado, e há um botão de trancar agora em Ajustes.
 
 ## Como funciona
 
@@ -126,6 +144,13 @@ Duas telas fazem o papel de quem acompanha:
 ## Painel principal
 Briefing do treinador · mesociclo · treino do dia · calorias e macros · passos e cardio ·
 prontidão · peso e tendência · ritmo do objetivo.
+
+## Desenho
+
+O acabamento segue a filosofia **Instrumento Silencioso** (`design/PHILOSOPHY.md`): tinta profunda,
+osso, e um único sinal em latão racionado como metal precioso. Tipografia de instrumento — serifada
+e fina nos números, monoespaçada e miúda nas etiquetas. Movimento com inércia: nada salta, tudo
+assenta. A prancha `design/cadencia.png` é o manifesto visual do movimento.
 
 ## Instalar no celular
 Abra o site publicado no navegador e use **Compartilhar → Adicionar à Tela de Início** (iPhone) ou

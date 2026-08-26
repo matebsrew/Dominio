@@ -51,8 +51,10 @@ export function render({ profile, go }) {
       </div>
 
       <div class="card">
-        <div class="card-head"><div><div class="eyebrow">Meta do dia · ${esc(m.cycle || '')}</div>
-          <h2>${fmt(totals.kcal)} / ${fmt(m.kcal)} kcal</h2></div>
+        <div class="card-head">
+          <div><div class="eyebrow">Meta do dia</div>
+            <h2>${fmt(totals.kcal)} / ${fmt(m.kcal)} kcal</h2>
+            ${m.cycle ? `<div class="dim tiny" style="margin-top:4px">${esc(m.cycle)}</div>` : ''}</div>
           <span class="pill ${totals.kcal > m.kcal * 1.08 ? 'warn' : 'good'}">${signed(m.kcal - totals.kcal, 0, ' kcal')}</span></div>
         ${progressBar(totals.kcal, m.kcal, totals.kcal > m.kcal * 1.08 ? 'warn' : '')}
         <div class="grid-3 mt">
@@ -195,8 +197,9 @@ export function render({ profile, go }) {
 
 function macroBox(label, value, target, tone) {
   const pct = target > 0 ? clamp((value / target) * 100, 0, 100) : 0;
-  return `<div>
-    <div class="row between tiny"><span class="muted">${esc(label)}</span><b>${fmt(value)}/${fmt(target)}</b></div>
+  return `<div class="macro">
+    <span class="macro-label">${esc(label)}</span>
+    <span class="macro-value">${fmt(value)} <i>/ ${fmt(target)}</i></span>
     ${progressBar(pct, 100, tone)}
   </div>`;
 }

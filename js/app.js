@@ -1,7 +1,7 @@
 // Domínio — treinador pessoal da família. Roteador e casca do app.
 
 import { $, esc } from './core/util.js';
-import { getState, activeProfile, subscribe, hasLegacyData } from './core/store.js';
+import { getState, activeProfile, subscribe, hasLegacyData, hasVault, isUnlocked, lockVault } from './core/store.js';
 import { tabbar, avatarHtml } from './ui.js';
 
 import * as profilesView from './views/profiles.js';
@@ -15,6 +15,7 @@ import * as bodyView from './views/body.js';
 import * as historyView from './views/history.js';
 import * as settingsView from './views/settings.js';
 import * as weekView from './views/week.js';
+import * as lockView from './views/lock.js';
 
 const ROUTES = {
   perfis: profilesView,
@@ -46,6 +47,9 @@ async function render() {
   const state = getState();
   const { name, params } = parseRoute();
 
+  // Nada acontece antes de a casa estar destrancada.
+  if (!isUnlocked()) return renderLock();
+
   // Sem perfil algum: tela de perfis, que oferece criar um a um ou a família inteira.
   if (!state.profiles.length && !['novo', 'perfis'].includes(name)) return go('/perfis');
   // Perfil não escolhido ainda.
@@ -74,6 +78,7 @@ async function render() {
     </div>` : '';
   $('#topbar').classList.toggle('hidden', !showChrome);
 
+  app.className = 'app';
   app.innerHTML = output.html;
   $('#tabbar').innerHTML = showChrome ? tabbar(name) : '';
 
@@ -84,6 +89,32 @@ async function render() {
     btn.addEventListener('click', () => go('/perfis'));
   });
 }
+
+function renderLock() {
+  currentCleanup?.();
+  currentCleanup = null;
+  const view = lockView.render();
+  $('#topbar').classList.add('hidden');
+  $('#topbar').innerHTML = '';
+  $('#tabbar').innerHTML = '';
+  const app = $('#app');
+  app.className = 'app app-lock';
+  app.innerHTML = view.html;
+  currentCleanup = view.mount?.(app) || null;
+}
+
+/* ---------- Tranca automática ---------- */
+
+const AUTO_LOCK_MS = 15 * 60 * 1000;
+let hiddenAt = null;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+  } else if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && isUnlocked()) {
+    lockVault();
+  }
+});
 
 window.addEventListener('hashchange', render);
 subscribe(() => {

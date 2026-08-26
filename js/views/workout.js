@@ -146,11 +146,7 @@ function checkinForm(pain = {}) {
         <label>${esc(q.label)} <span class="dim" style="font-weight:600">· ${esc(q.hint)}</span></label>
         ${scaleInput(q.key, draftCheckin[q.key], q.scale)}
       </div>`).join('')}
-    <div class="grid-2">
-      ${field('Horas de sono (opcional)', '<input type="number" inputmode="decimal" name="sleepHours" step="0.5" min="0" max="14" placeholder="7,5">')}
-      <div class="field"><label>Prontidão</label>
-        <div class="muted tiny">Some as respostas acima automaticamente.</div></div>
-    </div>
+    ${field('Horas de sono na noite passada (opcional)', '<input type="number" inputmode="decimal" name="sleepHours" step="0.5" min="0" max="14" placeholder="7,5">')}
     <div class="field">
       <label>Alguma articulação incomodando? (opcional)</label>
       <div class="chips" data-pain>
