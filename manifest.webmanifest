@@ -1,6 +1,6 @@
 {
-  "name": "Treino V4 Retorno",
-  "short_name": "Treino V4",
+  "name": "Treino — Retorno",
+  "short_name": "Treino",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
