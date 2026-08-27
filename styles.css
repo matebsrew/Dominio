@@ -544,6 +544,24 @@ button.sm.warn { background: var(--warn); color: #1D1305; border-color: transpar
 .app > *:nth-child(6) { animation-delay: .20s }
 .app > *:nth-child(n+7) { animation-delay: .22s }
 
+/* ---------- Abertura e falhas ---------- */
+.boot { display: grid; place-items: center; gap: 18px; min-height: 70svh; text-align: center; color: var(--dim); }
+.boot p { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; margin: 0; }
+.boot-pulse {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--line-firm); border-top-color: var(--brass);
+  animation: spin 1.1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+.boot-error { align-content: center; gap: 12px; padding: 24px 8px; color: var(--text); }
+.boot-error h1 { font-family: var(--serif); font-weight: 400; font-size: 30px; letter-spacing: .01em; }
+.boot-error .boot-detail {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: none;
+  color: var(--warn); max-width: 34ch; line-height: 1.6; word-break: break-word;
+}
+.boot-error button { width: 100%; max-width: 300px; }
+.boot-error .boot-hint { color: var(--dim); letter-spacing: .1em; }
+
 /* ---------- Porta de entrada ---------- */
 .app-lock { max-width: 460px; padding: 0 22px; }
 .lock { min-height: 100svh; display: grid; place-items: center; padding: 40px 0; }
