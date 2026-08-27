@@ -5,6 +5,7 @@ import { createProfile, setProgram, profiles, hasLegacyData, importLegacyInto } 
 import { generateProgram } from '../engine/program.js';
 import { ACTIVITY_LABEL, GOAL_LABEL, calorieTarget, macros } from '../engine/energy.js';
 import { EQUIPMENT_LABEL } from '../data/exercises.js';
+import { PRIORITY_MUSCLES } from '../data/muscles.js';
 import { field, selectHtml, numberInput } from '../ui.js';
 import { WEEKDAYS_SHORT } from '../core/util.js';
 
@@ -17,7 +18,7 @@ const draft = {
   daysPerWeek: 4, sessionMin: 60, equipment: 'academia_completa', preferredDays: null,
   activityLevel: 'leve', cardioLevel: 'pouco',
   dietPreference: 'onivoro', mealsPerDay: 4,
-  dislikes: []
+  priorityMuscle: '', dislikes: []
 };
 
 let step = 0;
@@ -56,6 +57,10 @@ const STEPS = [
     html: () => `
       ${field('Objetivo principal', `<div class="chips" data-goal>${Object.entries(GOAL_LABEL).map(([k, v]) =>
         `<button type="button" class="chip ${draft.goal === k ? 'on' : ''}" data-value="${k}">${esc(v)}</button>`).join('')}</div>`)}
+      ${field('O que você mais quer desenvolver? (opcional)', selectHtml('priorityMuscle', [
+        { value: '', label: 'Nada em especial — equilibrado' },
+        ...PRIORITY_MUSCLES
+      ], draft.priorityMuscle), 'O músculo escolhido é treinado primeiro na sessão, com você descansado — é quando a série rende mais.')}
       ${field('Experiência com musculação', `<div class="chips" data-experience>${[
         ['iniciante', 'Iniciante — até 1 ano'],
         ['intermediario', 'Intermediário — 1 a 3 anos'],
@@ -216,6 +221,7 @@ function finish(go) {
     cardioLevel: draft.cardioLevel,
     dietPreference: draft.dietPreference,
     mealsPerDay: draft.mealsPerDay,
+    priorityMuscle: draft.priorityMuscle || null,
     dislikes: []
   });
 

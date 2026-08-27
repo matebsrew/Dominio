@@ -69,5 +69,11 @@ export function muscleLabel(key) {
   return MUSCLES[key]?.label || key;
 }
 
+// Músculos que fazem sentido eleger como prioridade de um mesociclo.
+export const PRIORITY_MUSCLES = [
+  'peito', 'dorsais', 'ombro_lat', 'ombro_post', 'biceps', 'triceps',
+  'quadriceps', 'isquiotibiais', 'gluteos', 'panturrilhas', 'core'
+].map(value => ({ value, label: MUSCLES[value].label }));
+
 // Séries indiretas contam metade — padrão usado no cálculo de volume semanal.
 export const INDIRECT_FACTOR = 0.5;

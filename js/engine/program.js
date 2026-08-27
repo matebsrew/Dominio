@@ -14,6 +14,10 @@ import { clamp } from '../core/util.js';
 
 const LEVEL_RANK = { iniciante: 1, intermediario: 2, avancado: 3 };
 
+// Teto de séries por músculo em uma única sessão. Acima disso a fadiga degrada
+// a qualidade das séries seguintes e o ganho por série despenca (BuffBook 5.5.2).
+export const SESSION_SET_CAP = 8;
+
 // Estrutura de cada dia: prioridades de padrão de movimento, na ordem de execução.
 const TEMPLATES = {
   2: {
@@ -130,6 +134,11 @@ export function generateProgram(profile) {
       if (chosen.length >= perDay) break;
       const ex = pick(pool, pattern, used, profile);
       if (!ex) continue;
+      // Não passa do teto por músculo nesta sessão.
+      const jaNaSessao = chosen
+        .filter(c => c.primary === ex.primary)
+        .reduce((acc, c) => acc + c.sets, 0);
+      if (jaNaSessao >= SESSION_SET_CAP) continue;
       used.add(ex.id);
       chosen.push({
         id: ex.id,
@@ -154,7 +163,8 @@ export function generateProgram(profile) {
         });
       }
     }
-    return { name: day.name, exercises: chosen, estimatedMin: estimateMinutes(chosen) };
+    const ordenados = sequence(chosen, profile);
+    return { name: day.name, exercises: ordenados, estimatedMin: estimateMinutes(ordenados) };
   });
 
   const gaps = balanceVolume(built, profile);
@@ -168,6 +178,37 @@ export function generateProgram(profile) {
     days: built,
     weekdays: assignWeekdays(days, profile.preferredDays)
   };
+}
+
+/**
+ * Ordem dentro da sessão (BuffBook 5.6): o que você mais quer que cresça vem
+ * primeiro, com o sistema nervoso fresco. Depois os compostos, depois o resto.
+ */
+export function sequence(exercises, profile) {
+  const prioridade = profile.priorityMuscle;
+  return exercises
+    .map((ex, i) => ({ ex, i }))
+    .sort((a, b) => {
+      const p = m => (prioridade && (m.ex.primary === prioridade || (m.ex.secondary || []).includes(prioridade)) ? 0 : 1);
+      const prioDiff = p(a) - p(b);
+      if (prioDiff) return prioDiff;
+      // dentro do mesmo grupo, preserva a ordem pensada do template
+      return a.i - b.i;
+    })
+    .map(x => x.ex);
+}
+
+/** Séries por músculo em uma sessão — para avisar quando passa do teto. */
+export function sessionLoad(exercises) {
+  const porMusculo = {};
+  for (const ex of exercises) porMusculo[ex.primary] = (porMusculo[ex.primary] || 0) + ex.sets;
+  return porMusculo;
+}
+
+export function overCap(exercises, cap = SESSION_SET_CAP) {
+  return Object.entries(sessionLoad(exercises))
+    .filter(([, n]) => n > cap)
+    .map(([muscle, n]) => ({ muscle, sets: n }));
 }
 
 export function estimateMinutes(exercises) {
