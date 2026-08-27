@@ -1,8 +1,10 @@
 // Persistência local. Tudo fica no aparelho — nada sai para servidor algum.
 
 import { uid, today, dateKey, weekStart } from './util.js';
+import * as vault from './vault.js';
 
-const KEY = 'dominio.state.v1';
+const VAULT = 'dominio.vault.v1';
+const LEGACY_PLAIN = 'dominio.state.v1';   // versão anterior, sem cifra
 const LEGACY_DATA = 'treinoV4Data';
 const LEGACY_SETTINGS = 'treinoV4Settings';
 
@@ -13,47 +15,113 @@ function emptyProfileData() {
     sessions: [],      // treinos concluídos
     checkins: [],      // check-ins de prontidão
     body: [],          // peso, bioimpedância e medidas
+    feedback: [],      // RSM pós-treino por músculo
     nutrition: {},     // dateKey -> { meals: [], water, notes }
     activity: {},      // dateKey -> { steps, cardio: [] }
     program: null,     // programa gerado
-    settings: { kcalOffset: 0, mesoWeek: 1, weekTag: null, deloadUntil: null, lastAdjust: null }
+    settings: {
+      kcalOffset: 0, mesoWeek: 1, weekTag: null, deloadUntil: null, deloadStart: null,
+      lastAdjust: null, volumeBias: {}, pain: {}, favorites: []
+    }
   };
 }
 
 function blankState() {
-  return { version: 1, activeProfileId: null, profiles: [], data: {} };
+  return { version: 2, activeProfileId: null, profiles: [], data: {} };
 }
 
-let state = load();
-
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return migrate(JSON.parse(raw));
-  } catch (err) {
-    console.warn('Falha ao ler dados salvos:', err);
-  }
-  return blankState();
-}
+let state = blankState();
+let cryptoKey = null;
+let salt = null;
+let writeChain = Promise.resolve();
 
 function migrate(loaded) {
   const s = { ...blankState(), ...loaded };
   s.profiles = Array.isArray(s.profiles) ? s.profiles : [];
   s.data = s.data && typeof s.data === 'object' ? s.data : {};
   for (const p of s.profiles) {
-    s.data[p.id] = { ...emptyProfileData(), ...(s.data[p.id] || {}) };
-    s.data[p.id].settings = { ...emptyProfileData().settings, ...(s.data[p.id].settings || {}) };
+    const base = emptyProfileData();
+    s.data[p.id] = { ...base, ...(s.data[p.id] || {}) };
+    s.data[p.id].settings = { ...base.settings, ...(s.data[p.id].settings || {}) };
+    s.data[p.id].feedback = s.data[p.id].feedback || [];
   }
   return s;
 }
 
-export function persist() {
+/* ---------- Cofre ---------- */
+
+export const hasVault = () => !!localStorage.getItem(VAULT);
+export const isUnlocked = () => !!cryptoKey;
+export const cryptoSupported = () => vault.supported();
+
+function readVault() {
+  try { return JSON.parse(localStorage.getItem(VAULT) || 'null'); } catch { return null; }
+}
+
+/** Cria o cofre com a frase escolhida, trazendo dados antigos se existirem. */
+export async function createVault(passphrase) {
+  salt = vault.newSalt();
+  cryptoKey = await vault.deriveKey(passphrase, salt);
+
+  let seed = blankState();
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch (err) {
-    console.error('Não foi possível salvar:', err);
-  }
+    const plain = JSON.parse(localStorage.getItem(LEGACY_PLAIN) || 'null');
+    if (plain && Array.isArray(plain.profiles)) seed = plain;
+  } catch { /* ignora */ }
+
+  state = migrate(seed);
+  await writeVault();
+  try { localStorage.removeItem(LEGACY_PLAIN); } catch { /* ignora */ }
   listeners.forEach(fn => fn(state));
+}
+
+/** Abre o cofre. Devolve false se a frase estiver errada. */
+export async function unlockVault(passphrase) {
+  const blob = readVault();
+  if (!blob) return false;
+  try {
+    const s = vault.saltOf(blob);
+    const key = await vault.deriveKey(passphrase, s);
+    const data = await vault.open(blob, key);
+    cryptoKey = key;
+    salt = s;
+    state = migrate(data);
+    listeners.forEach(fn => fn(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function lockVault() {
+  cryptoKey = null;
+  salt = null;
+  state = blankState();
+  listeners.forEach(fn => fn(state));
+}
+
+export async function changePassphrase(current, next) {
+  const ok = await unlockVault(current);
+  if (!ok) return false;
+  const snapshot = state;
+  salt = vault.newSalt();
+  cryptoKey = await vault.deriveKey(next, salt);
+  state = snapshot;
+  await writeVault();
+  return true;
+}
+
+async function writeVault() {
+  if (!cryptoKey) return;
+  const blob = await vault.seal(state, cryptoKey, salt);
+  localStorage.setItem(VAULT, JSON.stringify(blob));
+}
+
+export function persist() {
+  listeners.forEach(fn => fn(state));
+  if (!cryptoKey) return;
+  // As escritas são encadeadas: a última a entrar é a última a gravar.
+  writeChain = writeChain.then(writeVault).catch(err => console.error('Falha ao gravar:', err));
 }
 
 export function subscribe(fn) {
@@ -205,6 +273,41 @@ export function addCardio(date, entry) {
 export function removeCardio(date, id) {
   const day = activityDay(date);
   day.cardio = day.cardio.filter(c => c.id !== id);
+  persist();
+}
+
+export function saveFeedback(entry) {
+  const d = pdata();
+  d.feedback = (d.feedback || []).filter(f => !(f.date === entry.date && f.muscle === entry.muscle));
+  d.feedback.push({ ...entry, ts: Date.now() });
+  d.feedback.sort((a, b) => (a.date < b.date ? 1 : -1));
+  persist();
+}
+
+export function applyVolumeBias(map) {
+  const d = pdata();
+  d.settings.volumeBias = { ...(d.settings.volumeBias || {}), ...map };
+  persist();
+}
+
+export function setPain(regions) {
+  const d = pdata();
+  d.settings.pain = regions || {};
+  persist();
+}
+
+export function saveFavoriteMeal(meal) {
+  const d = pdata();
+  d.settings.favorites = d.settings.favorites || [];
+  if (d.settings.favorites.some(f => f.name === meal.name)) return;
+  d.settings.favorites.unshift({ ...meal, id: uid() });
+  d.settings.favorites = d.settings.favorites.slice(0, 20);
+  persist();
+}
+
+export function removeFavoriteMeal(id) {
+  const d = pdata();
+  d.settings.favorites = (d.settings.favorites || []).filter(f => f.id !== id);
   persist();
 }
 

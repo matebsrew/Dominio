@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "assessment": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/assessment/SKILL.md",
+      "computedHash": "ed974c3d2d13485572635ba94564cac78094f99fc2334405982bc969d1402156"
+    },
+    "program-creation": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/program-creation/SKILL.md",
+      "computedHash": "12b8629ca9e017ba7b9583298d7909b9d0630a5ee18c1a12365b52a6adc87449"
+    },
+    "rp-diet": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/rp-diet/SKILL.md",
+      "computedHash": "ce9305e80c1ea5430eacb0a622069794ec5a6000d92ad42f1b1efb36e225dd17"
+    },
+    "rp-training": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/rp-training/SKILL.md",
+      "computedHash": "f814a223e5a748a2134c525a72a6bad40315a547c7e1cbd29759114e5d2e75ab"
+    },
+    "sbs-training": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/sbs-training/SKILL.md",
+      "computedHash": "a92ac5a5c97ec3b8c37f99f268a75ca8d8dd389ee6fc5a53f5e6efb648de5f00"
+    },
+    "schoenfeld-hypertrophy": {
+      "source": "borisghidaglia/science-based-lifter",
+      "sourceType": "github",
+      "skillPath": "skills/schoenfeld-hypertrophy/SKILL.md",
+      "computedHash": "800042ef2877ad9793808abeb956d7dbcf008c8a53a87087d359f666b5342eb1"
+    }
+  }
+}

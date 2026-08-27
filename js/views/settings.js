@@ -1,11 +1,11 @@
 // Ajustes do perfil, backup e privacidade.
 
 import { esc, num, toast, download, today } from '../core/util.js';
-import { activeProfile, updateProfile, pdata, setProgram, deleteProfile, exportAll, importAll, profiles, updateSettings, hasLegacyData, importLegacyInto } from '../core/store.js';
+import { activeProfile, updateProfile, pdata, setProgram, deleteProfile, exportAll, importAll, profiles, updateSettings, hasLegacyData, importLegacyInto, lockVault, changePassphrase } from '../core/store.js';
 import { generateProgram } from '../engine/program.js';
 import { ACTIVITY_LABEL, GOAL_LABEL, calorieTarget, macros } from '../engine/energy.js';
 import { EQUIPMENT_LABEL } from '../data/exercises.js';
-import { field, selectHtml, confirmSheet, coach } from '../ui.js';
+import { field, selectHtml, confirmSheet, coach, sheet, closeSheet } from '../ui.js';
 import { targetsFor } from '../engine/diary.js';
 
 export function render({ profile, go }) {
@@ -75,8 +75,19 @@ export function render({ profile, go }) {
       </div>
 
       <div class="card">
+        <div class="eyebrow">Acesso</div>
+        <h3>Cofre da casa</h3>
+        <p class="muted">Os dados deste aparelho estão cifrados com a frase de acesso. Quem abrir o endereço sem ela encontra um app vazio.</p>
+        <div class="grid-2 mt">
+          <button data-trancar>Trancar agora</button>
+          <button data-frase>Mudar a frase</button>
+        </div>
+        <p class="dim tiny mt">O app também tranca sozinho depois de 15 minutos fechado. Perdeu a frase, perdeu os dados — não existe recuperação. Guarde um backup.</p>
+      </div>
+
+      <div class="card">
         <div class="eyebrow">Backup</div>
-        <p class="muted">Tudo fica salvo apenas neste aparelho, sem conta e sem servidor. Exporte antes de trocar de celular ou limpar o navegador.</p>
+        <p class="muted">O arquivo exportado sai <b>sem cifra</b>, para você conseguir abrir em qualquer aparelho. Guarde em lugar seguro e exporte antes de trocar de celular ou limpar o navegador.</p>
         <div class="grid-2">
           <button data-exportar>Exportar backup</button>
           <button data-importar-btn>Importar backup</button>
@@ -92,6 +103,9 @@ export function render({ profile, go }) {
         <button class="block mt" data-novo>Criar novo perfil</button>
         <button class="danger block mt" data-apagar>Apagar o perfil ${esc(profile.name)}</button>
       </div>
+
+      ${coach('Sobre privacidade',
+        'O endereço do site é público — não existe como esconder um site estático. O que protege vocês é a cifra: sem a frase, os dados gravados aqui são ilegíveis e o app abre vazio. Nada é enviado para servidor nenhum.', '')}
 
       ${coach('Sobre as recomendações',
         'O app usa referências de treinamento e nutrição bem estabelecidas, mas trabalha com estimativas. Dor persistente, tontura, condição de saúde, gravidez ou uso de medicação pedem acompanhamento de médico e nutricionista — nenhum cálculo aqui substitui isso.', 'warn')}`,
@@ -146,6 +160,33 @@ export function render({ profile, go }) {
       root.querySelector('[data-legacy]')?.addEventListener('click', () => {
         const n = importLegacyInto(profile.id);
         toast(n ? `${n} treinos importados.` : 'Nada novo para importar.');
+      });
+
+      root.querySelector('[data-trancar]')?.addEventListener('click', () => lockVault());
+
+      root.querySelector('[data-frase]')?.addEventListener('click', () => {
+        sheet(`
+          <h2>Mudar a frase de acesso</h2>
+          <p class="muted">A frase atual é necessária para reabrir o cofre e cifrar tudo de novo com a frase nova.</p>
+          ${field('Frase atual', '<input type="password" name="atual" autocomplete="current-password">')}
+          ${field('Nova frase', '<input type="password" name="nova" autocomplete="new-password">')}
+          ${field('Repita a nova', '<input type="password" name="conf" autocomplete="new-password">')}
+          <button class="primary block mt" data-salvar-frase>Trocar</button>
+          <button class="ghost block" data-close>Cancelar</button>`, {
+          onMount(sheetEl) {
+            sheetEl.querySelector('[data-salvar-frase]').addEventListener('click', async () => {
+              const atual = sheetEl.querySelector('[name="atual"]').value;
+              const nova = sheetEl.querySelector('[name="nova"]').value;
+              const conf = sheetEl.querySelector('[name="conf"]').value;
+              if (nova.length < 6) return toast('Use pelo menos 6 caracteres.');
+              if (nova !== conf) return toast('As duas frases não são iguais.');
+              const ok = await changePassphrase(atual, nova);
+              if (!ok) return toast('Frase atual incorreta.');
+              closeSheet();
+              toast('Frase trocada.');
+            });
+          }
+        });
       });
 
       root.querySelector('[data-trocar]').addEventListener('click', () => go('/perfis'));

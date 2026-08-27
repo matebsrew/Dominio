@@ -3,6 +3,8 @@
 import { esc, fmt, kg, today, formatLongDate, weekdayIndex, clamp, signed, sparkline, ring, minutesLabel } from '../core/util.js';
 import { pdata, updateSettings } from '../core/store.js';
 import { snapshot } from '../engine/diary.js';
+import { dailyBriefing } from '../engine/coach.js';
+import { phase, deloadPrescription, startDeload } from '../engine/mesocycle.js';
 import { dayForWeekday, nextDay, estimateMinutes } from '../engine/program.js';
 import { deloadCheck } from '../engine/progression.js';
 import { band } from '../engine/readiness.js';
@@ -17,7 +19,9 @@ export function render({ profile, go }) {
   const scheduled = dayForWeekday(program, weekdayIndex(today()));
   const upcoming = scheduled || nextDay(program, data.sessions);
   const deload = deloadCheck(data.sessions, data.checkins, profile, data.settings);
-  const isDeload = !!data.settings.deloadUntil && data.settings.deloadUntil >= today();
+  const ph = phase(profile, data.settings);
+  const isDeload = ph.isDeload;
+  const briefing = dailyBriefing(profile, data, snap);
 
   const firstName = profile.name.split(' ')[0];
   const hour = new Date().getHours();
@@ -27,13 +31,14 @@ export function render({ profile, go }) {
     title: `${greeting}, ${firstName}`,
     subtitle: formatLongDate(today()),
     html: `
-      ${alerts(snap, deload, isDeload)}
+      ${briefingCard(briefing)}
+      ${mesoCard(ph, deload, isDeload)}
       ${trainingCard(snap, upcoming, scheduled, isDeload)}
       ${nutritionCard(snap)}
       ${activityCard(snap)}
       ${recoveryCard(snap)}
       ${weightCard(snap, profile)}
-      ${goalCard(snap, profile, adjShownOnTop(snap))}
+      ${goalCard(snap, profile, briefing.some(b => b.title === snap.adjustment.title))}
       <div class="row" style="justify-content:center;margin-top:18px;gap:16px">
         <button class="link" data-nav="/historico">Histórico</button>
         <button class="link" data-nav="/ajustes">Ajustes</button>
@@ -41,44 +46,47 @@ export function render({ profile, go }) {
 
     mount(root) {
       root.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => go(b.dataset.nav)));
-      root.querySelector('[data-aplicar-ajuste]')?.addEventListener('click', () => {
-        const delta = +root.querySelector('[data-aplicar-ajuste]').dataset.aplicarAjuste;
-        updateSettings({
-          kcalOffset: (data.settings.kcalOffset || 0) + delta,
-          lastAdjust: snap.weekStart
-        });
-      });
+      root.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go.replace('#', ''))));
       root.querySelector('[data-deload]')?.addEventListener('click', () => {
-        const until = new Date();
-        until.setDate(until.getDate() + 7);
-        updateSettings({ deloadUntil: until.toISOString().slice(0, 10), mesoWeek: 1 });
+        updateSettings(startDeload());
       });
     }
   };
 }
 
-function alerts(snap, deload, isDeload) {
-  const out = [];
-  if (isDeload) {
-    out.push(coach('Semana de deload em andamento',
-      'Cargas em torno de 90%, metade das séries e 3–4 repetições na reserva. É aqui que a recuperação acontece.', 'violet'));
-  } else if (deload.recommended) {
-    out.push(`<div class="card tight">
-      ${coach('Hora de um deload', deload.reasons.join(' '), 'warn')}
-      <button class="warn block sm" data-deload>Iniciar semana de deload</button>
-    </div>`);
-  }
+function briefingCard(items) {
+  if (!items.length) return '';
+  return `<div class="card">
+    <div class="card-head"><div><div class="eyebrow">Seu treinador</div><h2>O que importa agora</h2></div></div>
+    ${items.map(i => `
+      <div class="coach ${i.tone === 'accent' ? '' : i.tone}">
+        <b>${esc(i.title)}</b>${esc(i.text)}
+        ${i.action ? `<div style="margin-top:8px"><button class="sm" data-go="${esc(i.action.href)}">${esc(i.action.label)}</button></div>` : ''}
+      </div>`).join('')}
+  </div>`;
+}
 
-  const adj = snap.adjustment;
-  if (adj.status === 'ajustar' && adj.deltaKcal) {
-    out.push(`<div class="card tight">
-      ${coach(adj.title, adj.detail, adj.deltaKcal > 0 ? 'good' : 'warn')}
-      <button class="primary block sm" data-aplicar-ajuste="${adj.deltaKcal}">
-        Aplicar ${signed(adj.deltaKcal, 0, ' kcal/dia')}
-      </button>
-    </div>`);
-  }
-  return out.join('');
+function mesoCard(ph, deload, isDeload) {
+  const bar = Array.from({ length: ph.total }, (_, i) => {
+    const n = i + 1;
+    const state = n < ph.week ? 'good' : n === ph.week ? 'accent' : '';
+    const isDeloadWeek = n > ph.accumulation;
+    return `<span title="semana ${n}" style="flex:1;height:6px;border-radius:99px;background:${
+      state === 'good' ? 'var(--good)' : state === 'accent' ? (isDeloadWeek ? 'var(--violet)' : 'var(--accent)') : 'var(--line)'
+    }"></span>`;
+  }).join('');
+
+  return `<div class="card">
+    <div class="card-head">
+      <div><div class="eyebrow">Mesociclo</div><h2>${esc(ph.label)}</h2></div>
+      <span class="pill ${isDeload ? 'violet' : ''}">RIR ${esc(ph.rir.label)}</span>
+    </div>
+    <div class="row tight" style="gap:4px;margin:4px 0 10px">${bar}</div>
+    <div class="muted tiny">${esc(ph.intent)}</div>
+    ${!isDeload && deload.recommended ? `
+      <div class="coach warn" style="margin-top:10px"><b>Sinais de fadiga acumulada</b>${esc(deload.reasons.join(' '))}</div>
+      <button class="warn block sm" data-deload>Iniciar deload agora</button>` : ''}
+  </div>`;
 }
 
 function trainingCard(snap, upcoming, scheduled, isDeload) {
@@ -200,10 +208,6 @@ function weightCard(snap, profile) {
     <div class="row between tiny dim"><span>${series.length} semanas</span>${profile.targetWeightKg ? `<span>alvo ${kg(profile.targetWeightKg)}</span>` : ''}</div>
     <button class="block mt" data-nav="/corpo">Peso, bioimpedância e medidas</button>
   </div>`;
-}
-
-function adjShownOnTop(snap) {
-  return snap.adjustment.status === 'ajustar' && !!snap.adjustment.deltaKcal;
 }
 
 function goalCard(snap, profile, adjOnTop) {

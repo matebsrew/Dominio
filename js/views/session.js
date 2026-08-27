@@ -5,6 +5,10 @@ import { pdata, saveSession, checkinFor } from '../core/store.js';
 import { dayForWeekday, nextDay } from '../engine/program.js';
 import { suggest, describeSets, e1rm } from '../engine/progression.js';
 import { sessionPlan } from '../engine/readiness.js';
+import { phase, setsThisWeek, deloadPrescription } from '../engine/mesocycle.js';
+import { estimateLoad, warmupSets } from '../engine/loading.js';
+import { conflictsWith, saferAlternatives, REGIONS } from '../data/joints.js';
+import { musclesOf } from '../engine/feedback.js';
 import { BY_ID, alternatives } from '../data/exercises.js';
 import { guideHtml, bindGuides } from '../components/guide.js';
 import { coach, sheet, closeSheet, confirmSheet } from '../ui.js';
@@ -37,7 +41,9 @@ export function render({ profile, params, go }) {
   const day = { ...program.days[index], index };
   const checkin = checkinFor(today());
   const plan = sessionPlan(checkin || {}, { sleepHours: checkin?.sleepHours, pain: checkin?.pain });
-  const isDeload = !!data.settings.deloadUntil && data.settings.deloadUntil >= today();
+  const ph = phase(profile, data.settings);
+  const isDeload = ph.isDeload;
+  const pain = data.settings.pain || {};
 
   const draft = loadDraft(profile.id, day.name) || {
     profileId: profile.id, day: day.name, date: today(), startedAt: Date.now(),
@@ -56,7 +62,9 @@ export function render({ profile, params, go }) {
       reps: meta.reps || ex.reps,
       rest: meta.rest || ex.rest,
       type: meta.type || ex.type,
-      plannedSets: Math.max(1, Math.round(ex.sets * (plan.volumeFactor ?? 1)))
+      plannedSets: Math.max(1, Math.round(
+        setsThisWeek(ex.sets, ph, data.settings.volumeBias?.[meta.primary || ex.primary] || 0) * (plan.volumeFactor ?? 1)
+      ))
     };
   });
 
@@ -65,9 +73,9 @@ export function render({ profile, params, go }) {
     subtitle: 'sessão em andamento',
     html: `
       ${plan.score !== null ? coach(plan.title, plan.message, plan.band.tone) : ''}
-      ${isDeload ? coach('Deload', 'Cargas em torno de 90% e séries reduzidas. Não force progressão nesta semana.', 'violet') : ''}
+      ${isDeload ? coach('Deload', deloadPrescription(data.settings).text, 'violet') : ''}
       <div id="exercises">
-        ${exercises.map((ex, i) => exerciseCard(ex, i, data, plan, isDeload, draft)).join('')}
+        ${exercises.map((ex, i) => exerciseCard(ex, i, data, plan, ph, draft, profile, pain)).join('')}
       </div>
       <div class="card">
         <label>Como foi o treino? (opcional)</label>
@@ -112,7 +120,7 @@ export function render({ profile, params, go }) {
       });
 
       root.querySelectorAll('[data-trocar]').forEach(btn => {
-        btn.addEventListener('click', () => openSwap(btn.dataset.trocar, profile, draft, root));
+        btn.addEventListener('click', () => openSwap(btn.dataset.trocar, profile, draft, root, pain));
       });
 
       bindRowButtons(root, root);
@@ -146,7 +154,7 @@ export function render({ profile, params, go }) {
         clearDraft();
         stopTimer(root);
         const totalSets = payload.reduce((a, e) => a + e.sets.length, 0);
-        toast(`Treino salvo: ${totalSets} séries.`);
+        toast(`Treino salvo: ${totalSets} séries. Responda o feedback quando o músculo assentar.`);
         go('/hoje');
       });
 
@@ -163,24 +171,35 @@ export function render({ profile, params, go }) {
   };
 }
 
-function exerciseCard(ex, index, data, plan, isDeload, draft) {
+function exerciseCard(ex, index, data, plan, ph, draft, profile, pain) {
   const meta = BY_ID[ex.id] || ex;
-  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: isDeload });
+  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload });
   const saved = draft.sets?.[ex.id] || [];
   const count = Math.max(ex.plannedSets, saved.length);
+  const conflicts = conflictsWith(ex.id, pain);
+  const estimate = s.kind === 'primeira' ? estimateLoad(ex.id, profile) : null;
+  const workingKg = s.suggestedKg ?? (estimate && !estimate.bodyweight ? estimate.kg : null);
+  const warmups = warmupSets(ex.id, workingKg, profile);
 
   return `<div class="exercise-card" data-index="${index}" data-ex="${esc(ex.id)}">
     <div class="row between">
       <div style="min-width:0"><h3>${esc(ex.name)}</h3>
-        <div class="muted tiny">${ex.plannedSets} séries · ${ex.reps[0]}–${ex.reps[1]} reps · RIR ${s.targetRir}</div></div>
-      <button class="sm ghost" data-trocar="${esc(ex.id)}">trocar</button>
+        <div class="muted tiny">${ex.plannedSets} séries · ${ex.reps[0]}–${ex.reps[1]} reps · RIR ${esc(ph.isDeload ? ph.rir.label : s.targetRir)}</div></div>
+      <button class="sm ghost ${conflicts.length ? 'warn' : ''}" data-trocar="${esc(ex.id)}">${conflicts.length ? '⚠ trocar' : 'trocar'}</button>
     </div>
+    ${conflicts.length ? `<div class="coach warn"><b>Passa pelo ${conflicts.map(c => REGIONS[c].toLowerCase()).join(' e ')} dolorido</b>Troque por uma variação que poupe a articulação, ou reduza carga e amplitude até parar de incomodar.</div>` : ''}
 
     <div class="coach ${s.kind === 'subir' ? 'good' : s.kind === 'reduzir' || s.kind === 'segurar' ? 'warn' : ''}">
       <b>${esc(s.headline)}</b>${esc(s.detail)}
       ${s.warning ? `<div class="tiny" style="margin-top:6px;color:var(--warn)">${esc(s.warning)}</div>` : ''}
     </div>
     ${s.last ? `<div class="dim tiny">Última sessão (${esc(s.last.date)}): ${esc(describeSets(s.last.sets))}</div>` : ''}
+    ${estimate ? `<div class="dim tiny">${esc(estimate.text)}${estimate.caveat ? ' ' + esc(estimate.caveat) : ''}</div>` : ''}
+    ${warmups.length ? `<div class="warmup">
+      <span class="eyebrow">Aproximação</span>
+      ${warmups.map(w => `<span class="warmup-set"><i>${w.pct}%</i>${w.kg} kg × ${w.reps}</span>`).join('')}
+      <span class="dim tiny" style="display:block;margin-top:5px">Séries de aquecimento não contam no volume — não registre abaixo.</span>
+    </div>` : ''}
 
     <button class="link" data-toggle-guide="${esc(ex.id)}">📘 Como executar</button>
     ${guideHtml(ex.id)}
@@ -234,14 +253,19 @@ function collect(root, exercises) {
   return out;
 }
 
-function openSwap(exerciseId, profile, draft, root) {
-  const alts = alternatives(exerciseId, profile.equipment);
+function openSwap(exerciseId, profile, draft, root, pain = {}) {
+  const painful = Object.keys(pain).filter(r => pain[r]).length > 0;
+  const alts = painful
+    ? saferAlternatives(exerciseId, pain, profile.equipment)
+    : alternatives(exerciseId, profile.equipment);
   if (!alts.length) return toast('Sem alternativas cadastradas para este movimento.');
   sheet(`
     <h2>Trocar exercício</h2>
-    <p class="muted">Mesma função no treino — troque se o aparelho estiver ocupado ou se o movimento incomodar.</p>
+    <p class="muted">${painful
+      ? 'Alternativas escolhidas para poupar a articulação que você marcou como dolorida.'
+      : 'Mesma função no treino — troque se o aparelho estiver ocupado ou se o movimento incomodar.'}</p>
     ${alts.map(a => `<button class="block" style="justify-content:flex-start;margin:8px 0" data-alt="${esc(a.id)}">
-      <span style="text-align:left"><b>${esc(a.name)}</b><br><span class="dim tiny">${esc(a.feel)}</span></span></button>`).join('')}
+      <span style="text-align:left"><b>${esc(a.name)}</b>${a.relief ? ` <span class="pill ${a.relief === 'total' ? 'good' : 'warn'}">${a.relief === 'total' ? 'poupa a articulação' : 'alívio parcial'}</span>` : ''}<br><span class="dim tiny">${esc(a.feel)}</span></span></button>`).join('')}
     <button class="ghost block mt" data-close>Cancelar</button>`, {
     onMount(sheetEl) {
       sheetEl.querySelectorAll('[data-alt]').forEach(btn => {
