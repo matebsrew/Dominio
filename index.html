@@ -4,24 +4,139 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#0A0B0D">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Domínio">
-<meta name="description" content="Treinador pessoal da família: treino, alimentação, cardio e recuperação com ajuste automático.">
+<meta name="description" content="Treinador da casa: treino, alimentação, cardio e recuperação com ajuste automático.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&display=swap">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 <title>Domínio</title>
 </head>
 <body>
 <header id="topbar" class="topbar hidden"></header>
-<main id="app" class="app"></main>
+<main id="app" class="app">
+  <div id="boot" class="boot">
+    <div class="boot-pulse"></div>
+    <p>Abrindo…</p>
+  </div>
+</main>
 <div id="tabbar"></div>
-<script type="module" src="./js/app.js?v=2"></script>
-<noscript><p style="padding:24px">Este app precisa de JavaScript ativado.</p></noscript>
+<noscript><p style="padding:24px;color:#ECE9E1">Este app precisa de JavaScript ativado.</p></noscript>
+
+<script>
+/* Guarda de inicialização: roda antes de qualquer módulo.
+   Faz três coisas — limpa restos do app antigo, transforma qualquer falha
+   numa mensagem legível, e nunca deixa a tela em branco. */
+(function () {
+  /* Compatibilidade: .at() só existe em navegadores de 2021 para cá.
+     Sem isto, um navegador um pouco mais antigo abre em branco. */
+  if (!Array.prototype.at) {
+    Object.defineProperty(Array.prototype, 'at', {
+      value: function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return (n < 0 || n >= this.length) ? undefined : this[n]; },
+      writable: true, configurable: true
+    });
+  }
+  if (!String.prototype.at) {
+    Object.defineProperty(String.prototype, 'at', {
+      value: function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return (n < 0 || n >= this.length) ? undefined : this[n]; },
+      writable: true, configurable: true
+    });
+  }
+
+  var boot = document.getElementById('boot');
+  var shown = false;
+
+  function show(title, detail) {
+    if (shown || !boot || !boot.isConnected) return;
+    shown = true;
+    boot.className = 'boot boot-error';
+    boot.innerHTML =
+      '<h1>' + title + '</h1>' +
+      '<p class="boot-detail">' + String(detail || '').replace(/[<>&]/g, '') + '</p>' +
+      '<button type="button" id="bootReload">Tentar de novo</button>' +
+      '<button type="button" id="bootPurge">Limpar cache e recarregar</button>' +
+      '<p class="boot-hint">Se continuar, tire um print desta tela.</p>';
+    document.getElementById('bootReload').onclick = function () { location.reload(); };
+    document.getElementById('bootPurge').onclick = purge;
+  }
+
+  function purge() {
+    var jobs = [];
+    if ('serviceWorker' in navigator) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister(); }));
+      }).catch(function () {}));
+    }
+    if (window.caches) {
+      jobs.push(caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }).catch(function () {}));
+    }
+    Promise.all(jobs).then(function () {
+      location.replace(location.pathname + '?limpo=' + Date.now());
+    });
+  }
+
+  /* Restos do app anterior: service worker antigo que ainda serve arquivos
+     do cache é a causa mais comum de tela branca depois de uma troca de versão. */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function (rs) {
+      if (!rs.length) return;
+      rs.forEach(function (r) { r.unregister(); });
+      if (!sessionStorage.getItem('dominio.purged')) {
+        try { sessionStorage.setItem('dominio.purged', '1'); } catch (e) {}
+        purge();
+      }
+    }).catch(function () {});
+  }
+
+  function describe(e) {
+    if (!e) return '';
+    if (e.target && e.target.tagName === 'SCRIPT') return 'Não consegui buscar ' + (e.target.src || 'um arquivo do app') + '.';
+    if (e.error && e.error.message) return e.error.message;
+    if (e.message) return e.message;
+    if (e.reason) return (e.reason.message || String(e.reason));
+    return '';
+  }
+
+  /* onerror clássico traz mensagem, arquivo e linha — é o mais confiável. */
+  window.onerror = function (msg, src, line, col, err) {
+    var where = src ? ' (' + String(src).split('/').slice(-1)[0] + ':' + line + ')' : '';
+    show('Algo travou ao abrir', ((err && err.message) || msg || 'erro desconhecido') + where);
+    return false;
+  };
+
+  window.addEventListener('error', function (e) {
+    var d = describe(e);
+    if (e.target && e.target.tagName === 'SCRIPT') show('Não consegui carregar o app', d);
+    else if (d) show('Algo travou ao abrir', d);
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (e) {
+    show('Algo travou ao abrir', describe(e) || 'uma promessa foi rejeitada');
+  });
+
+  /* Rede de segurança: se em 8 segundos a tela de abertura ainda estiver aqui,
+     alguma coisa não rodou — melhor dizer isso do que ficar em branco. */
+  window.__bootFail = function () {
+    show('Não consegui carregar o app',
+      'O arquivo principal (js/app.js) não foi entregue pelo servidor.');
+  };
+
+  setTimeout(function () {
+    if (boot && boot.isConnected) {
+      show('O app não terminou de abrir',
+        'Provavelmente é uma versão antiga guardada no cache do navegador.');
+    }
+  }, 8000);
+})();
+</script>
+<script type="module" src="./js/app.js?v=3" onerror="window.__bootFail && window.__bootFail()"></script>
 </body>
 </html>

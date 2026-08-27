@@ -14,7 +14,15 @@ const dec = new TextDecoder();
 const toB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const fromB64 = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
 
-export const supported = () => !!(globalThis.crypto?.subtle);
+export function supported() {
+  // Defensivo de propósito: em navegador antigo ou fora de HTTPS isto some,
+  // e o app precisa avisar em vez de quebrar.
+  try {
+    return !!(window.crypto && window.crypto.subtle && window.crypto.subtle.importKey);
+  } catch {
+    return false;
+  }
+}
 
 export async function deriveKey(passphrase, salt) {
   const base = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
