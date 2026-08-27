@@ -491,6 +491,16 @@ button.sm.warn { background: var(--warn); color: #1D1305; border-color: transpar
 }
 .plateau-step.on .plateau-n { background: var(--warn); border-color: transparent; color: #1D1305; font-weight: 700; }
 
+.modality-guide {
+  margin-top: 8px; border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm); background: rgba(233,228,216,.02); padding: 10px 12px;
+}
+.modality-guide summary { cursor: pointer; list-style: none; font-size: 13px; }
+.modality-guide summary::-webkit-details-marker { display: none; }
+.modality-guide summary::before { content: '▸ '; color: var(--dim); }
+.modality-guide[open] summary::before { content: '▾ '; color: var(--dim); }
+.modality-body { margin-top: 8px; }
+
 /* ---------- Guia de execução ---------- */
 .guide {
   margin-top: 12px; border: 1px solid var(--line-soft); border-radius: var(--r-md);

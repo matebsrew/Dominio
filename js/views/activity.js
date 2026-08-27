@@ -2,7 +2,7 @@
 
 import { esc, fmt, num, toast, today, weekDays, weekStart, WEEKDAYS, weekdayIndex, minutesLabel, formatDate } from '../core/util.js';
 import { pdata, setSteps, addCardio, removeCardio, activityDay } from '../core/store.js';
-import { schedule, weeklyTarget, zone2Guide, CARDIO_TYPES, CARDIO_LABEL, weekMinutes, weekSteps } from '../engine/cardio.js';
+import { schedule, weeklyTarget, zone2Guide, sessionSteps, CARDIO_TYPES, CARDIO_LABEL, weekMinutes, weekSteps } from '../engine/cardio.js';
 import { weekMap } from '../engine/program.js';
 import { activityKcal } from '../engine/energy.js';
 import { coach, progressBar, sheet, closeSheet, field, selectHtml, metric } from '../ui.js';
@@ -69,6 +69,21 @@ export function render({ profile }) {
         <div class="stat-line"><span class="muted">Faixa de batimentos</span><b>${zone.zone2[0]}–${zone.zone2[1]} bpm</b></div>
         <div class="stat-line"><span class="muted">FC máxima estimada</span><b>${zone.maxHr} bpm</b></div>
         <p class="muted mt">${esc(zone.talkTest)}</p>
+        <p class="dim tiny mt">Vale para caminhada, corrida e esteira. Natação, bike e remo têm guia próprio abaixo — frequência cardíaca sozinha não dá conta neles.</p>
+      </div>
+
+      <div class="card">
+        <div class="eyebrow">Como fazer cada modalidade</div>
+        ${CARDIO_TYPES.map(c => {
+          const g = sessionSteps(c.id, 25);
+          return `<details class="modality-guide">
+            <summary><b>${esc(c.label)}</b> <span class="dim tiny">· guia por ${esc(g.metric.toLowerCase())}</span></summary>
+            <div class="modality-body">
+              ${g.steps.map(s => `<div class="stat-line"><span class="muted">${esc(s.label)}</span><b>${s.min} min · ${esc(s.detail)}</b></div>`).join('')}
+              <p class="dim tiny mt">${esc(g.tip)}</p>
+            </div>
+          </details>`;
+        }).join('')}
       </div>
 
       <div class="card">
@@ -104,9 +119,25 @@ function openCardioSheet(profile) {
       { value: 'moderada', label: 'Moderada — respiração acelerada' },
       { value: 'intensa', label: 'Intensa — não dá para falar frases' }
     ], 'leve'))}
+    <div id="cardioPreview"></div>
     <button class="primary block mt" data-salvar>Salvar</button>
     <button class="ghost block" data-close>Cancelar</button>`, {
     onMount(sheetEl) {
+      const preview = sheetEl.querySelector('#cardioPreview');
+      const renderPreview = () => {
+        const type = sheetEl.querySelector('[name="type"]').value;
+        const minutes = num(sheetEl.querySelector('[name="minutes"]').value) || 25;
+        const g = sessionSteps(type, minutes);
+        preview.innerHTML = `<div class="card flat tight mt">
+          <div class="eyebrow mb">Plano da sessão · ${esc(g.metric.toLowerCase())}</div>
+          ${g.steps.map(s => `<div class="stat-line"><span class="muted">${esc(s.label)}</span><b>${s.min} min · ${esc(s.detail)}</b></div>`).join('')}
+          <p class="dim tiny mt">${esc(g.tip)}</p>
+        </div>`;
+      };
+      sheetEl.querySelector('[name="type"]').addEventListener('change', renderPreview);
+      sheetEl.querySelector('[name="minutes"]').addEventListener('input', renderPreview);
+      renderPreview();
+
       sheetEl.querySelector('[data-salvar]').addEventListener('click', () => {
         const type = sheetEl.querySelector('[name="type"]').value;
         const minutes = num(sheetEl.querySelector('[name="minutes"]').value);

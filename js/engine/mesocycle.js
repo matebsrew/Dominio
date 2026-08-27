@@ -10,6 +10,7 @@
 
 import { clamp, weekStart, today, addDays, daysBetween } from '../core/util.js';
 import { landmarks } from '../data/muscles.js';
+import { conflictsWith } from '../data/joints.js';
 
 export const MESO_LENGTH = {
   iniciante: 5,      // 4 semanas de acumulação + deload
@@ -113,28 +114,35 @@ export function startDeload(days = 7) {
 
 /**
  * Fim do mesociclo: hora de revisar exercícios (Ch. 5 — Variação).
- * As três perguntas do livro, respondidas com os dados do próprio histórico.
+ * As três perguntas do livro, respondidas com os dados do próprio histórico:
+ * estagnou na carga, dói na articulação, ou o músculo-alvo já não sente nada.
  */
-export function exerciseReview(sessions, exerciseName, feedback = []) {
+export function exerciseReview(sessions, exercise, { pain = {}, feedback = [] } = {}) {
   const history = sessions
-    .flatMap(s => (s.exercises || []).filter(e => e.name === exerciseName).map(e => ({ date: s.date, sets: e.sets })))
+    .flatMap(s => (s.exercises || []).filter(e => e.id === exercise.id || e.name === exercise.name).map(e => ({ date: s.date, sets: e.sets })))
     .slice(0, 6);
   if (history.length < 3) return null;
 
   const best = arr => Math.max(...arr.map(x => (x.kg || 0) * (1 + (x.reps || 0) / 30)).filter(Number.isFinite), 0);
   const values = history.map(h => best(h.sets));
   const stalled = values[0] <= values[values.length - 1] * 1.01;
-  const painful = feedback.some(f => f.exercise === exerciseName && f.pain);
-  const stale = feedback.filter(f => f.exercise === exerciseName).slice(0, 3).every(f => (f.rsm ?? 9) <= 3);
+  const painful = conflictsWith(exercise.id, pain).length > 0;
+  const muscleFeedback = feedback
+    .filter(f => f.muscle === exercise.primary)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 3);
+  const stale = muscleFeedback.length >= 2 && muscleFeedback.every(f => (f.rsm ?? 9) <= 3);
 
   const flags = [stalled, painful, stale].filter(Boolean).length;
   return {
-    stalled, painful, stale,
+    exercise, stalled, painful, stale,
     verdict: painful ? 'trocar_agora' : flags >= 2 ? 'trocar_no_proximo' : 'manter',
     message: painful
       ? 'Este exercício vem causando dor. Troque agora por uma variação que não incomode.'
       : flags >= 2
-        ? 'Sem progresso e com estímulo fraco nas últimas sessões. Vale trocar por uma variação no próximo mesociclo.'
-        : 'Ainda está entregando: mantenha enquanto houver progresso, boa execução e conforto articular.'
+        ? 'Sem progresso na carga e pouca conexão/pump nas últimas sessões. Vale trocar por uma variação no próximo mesociclo.'
+        : stalled
+          ? 'A carga travou nas últimas sessões, mas o estímulo ainda chega — pode ser só platô normal, não precisa trocar ainda.'
+          : 'Ainda está entregando: mantenha enquanto houver progresso, boa execução e conforto articular.'
   };
 }

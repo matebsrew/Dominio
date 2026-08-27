@@ -90,3 +90,60 @@ export function portion(food, amount, useUnit = false) {
     grams: Math.round(grams)
   };
 }
+
+/* ---------- Porção pela mão (método sem balança) ----------
+ * Baseado no método de "porções pela mão" (Precision Nutrition): a própria
+ * mão escala com o corpo de quem come, então serve como referência sem
+ * precisar pesar nada. Uma porção "média" por grupo de alimento; o tamanho
+ * ajusta o quanto aquilo pesa de verdade. */
+
+export const HAND_PORTIONS = {
+  'Proteínas': { label: 'palma da mão', ref: 'do tamanho e da espessura da palma da mão, sem contar os dedos', grams: 120 },
+  'Carboidratos': { label: 'punho fechado', ref: 'do tamanho do seu punho fechado', grams: 150 },
+  'Laticínios': { label: 'punho fechado', ref: 'do tamanho do seu punho fechado', grams: 150 },
+  'Frutas e vegetais': { label: 'punho fechado', ref: 'do tamanho do seu punho fechado', grams: 100 },
+  'Gorduras': { label: 'polegar', ref: 'do tamanho do seu polegar, da dobra até a ponta', grams: 15 },
+  'Extras': { label: 'punho fechado', ref: 'do tamanho do seu punho fechado', grams: 80 }
+};
+
+export const HAND_SIZES = [
+  { id: 'p', label: 'Pequena', mult: 0.6 },
+  { id: 'm', label: 'Média', mult: 1 },
+  { id: 'g', label: 'Grande', mult: 1.5 }
+];
+
+export function handRef(food) {
+  return HAND_PORTIONS[food.group] || HAND_PORTIONS.Extras;
+}
+
+export function handPortion(food, sizeId = 'm', count = 1) {
+  const ref = handRef(food);
+  const size = HAND_SIZES.find(s => s.id === sizeId) || HAND_SIZES[1];
+  const grams = ref.grams * size.mult * Math.max(1, count || 1);
+  return { ...portion(food, grams), ref, size, count: Math.max(1, count || 1) };
+}
+
+/* ---------- Monte seu prato (sem escolher alimento nem pesar) ----------
+ * Quando a pessoa não quer procurar um alimento específico: monta o prato
+ * contando porções pela mão por grupo, usando um alimento representativo
+ * de cada grupo como referência de densidade calórica. */
+
+export const PLATE_GROUPS = [
+  { id: 'protein', label: 'Proteína', unit: 'palma da mão', hint: 'carne, frango, peixe, ovo, tofu...', grams: 120, per100: { kcal: 165, p: 31, c: 0, f: 3.6 } },
+  { id: 'carb', label: 'Carboidrato', unit: 'punho fechado', hint: 'arroz, batata, macarrão, pão...', grams: 150, per100: { kcal: 130, p: 2.6, c: 28, f: 0.4 } },
+  { id: 'fat', label: 'Gordura', unit: 'polegar', hint: 'azeite, manteiga, pasta de amendoim...', grams: 15, per100: { kcal: 700, p: 5, c: 6, f: 74 } },
+  { id: 'veg', label: 'Vegetais/salada', unit: 'punho fechado', hint: 'folhas, legumes, verduras...', grams: 100, per100: { kcal: 25, p: 2, c: 5, f: 0.3 } }
+];
+
+export function platePortion(counts = {}) {
+  let kcal = 0, protein = 0, carbs = 0, fat = 0;
+  for (const g of PLATE_GROUPS) {
+    const n = Math.max(0, counts[g.id] || 0);
+    const k = (g.grams * n) / 100;
+    kcal += g.per100.kcal * k;
+    protein += g.per100.p * k;
+    carbs += g.per100.c * k;
+    fat += g.per100.f * k;
+  }
+  return { kcal: Math.round(kcal), protein: +protein.toFixed(1), carbs: +carbs.toFixed(1), fat: +fat.toFixed(1) };
+}

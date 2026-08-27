@@ -2,13 +2,13 @@
 // o que muda na semana seguinte.
 
 import { esc, fmt, formatDate, weekStart, addDays, today, minutesLabel, bars, clamp, toast } from '../core/util.js';
-import { pdata, saveFeedback, applyVolumeBias, updateSettings } from '../core/store.js';
+import { pdata, saveFeedback, applyVolumeBias, updateSettings, swapProgramExercise } from '../core/store.js';
 import { weeklyReview, scoreLabel } from '../engine/coach.js';
 import { frequencyPerMuscle } from '../engine/progression.js';
-import { BY_ID } from '../data/exercises.js';
+import { BY_ID, alternatives } from '../data/exercises.js';
 import { muscleLabel } from '../data/muscles.js';
 import { RSM_QUESTIONS, rsmScore, pendingFeedback, readRsm } from '../engine/feedback.js';
-import { startDeload, phase, mesoLength } from '../engine/mesocycle.js';
+import { startDeload, phase, mesoLength, exerciseReview } from '../engine/mesocycle.js';
 import { MUSCLES } from '../data/muscles.js';
 import { coach, progressBar, metric, sheet, closeSheet, confirmSheet } from '../ui.js';
 
@@ -21,6 +21,12 @@ export function render({ profile, go }) {
   const sl = scoreLabel(review.score);
   const pending = pendingFeedback(data);
   const a = review.adherence;
+  const endOfMeso = review.isCurrent && review.phase.week >= review.phase.accumulation && !review.phase.isDeload;
+  const exReviews = endOfMeso && data.program
+    ? programExercises(data.program)
+      .map(ex => exerciseReview(data.sessions, ex, { pain: data.settings.pain, feedback: data.feedback }))
+      .filter(r => r && r.verdict !== 'manter')
+    : [];
 
   return {
     title: 'Semana',
@@ -73,6 +79,17 @@ export function render({ profile, go }) {
         ${review.phase.week >= review.phase.accumulation && !review.phase.isDeload
           ? '<button class="warn block mt" data-deload>Iniciar semana de deload</button>' : ''}
       </div>
+
+      ${exReviews.length ? `<div class="card">
+        <div class="card-head"><div><div class="eyebrow">Fim do mesociclo</div>
+          <h2>Vale revisar estes exercícios</h2></div></div>
+        <p class="muted">Mesmo movimento por ${review.phase.accumulation} semanas seguidas é hora de olhar de novo: o que travou na carga, dói ou já não estimula o músculo como antes ganha uma variação nova (BuffBook, cap. 5 — Variação).</p>
+        ${exReviews.map(r => `<div class="stat-line">
+          <div style="flex:1"><b>${esc(r.exercise.name)}</b>
+            <div class="dim tiny">${esc(r.message)}</div></div>
+          <button class="sm ${r.verdict === 'trocar_agora' ? 'warn' : 'ghost'}" data-revisar="${esc(r.exercise.id)}">trocar</button>
+        </div>`).join('')}
+      </div>` : ''}
 
       <div class="card">
         <div class="card-head"><div><div class="eyebrow">Volume por músculo</div>
@@ -131,8 +148,49 @@ export function render({ profile, go }) {
         const item = pending.find(p => p.session.id === btn.dataset.feedback);
         if (item) openFeedbackSheet(item);
       }));
+
+      root.querySelectorAll('[data-revisar]').forEach(btn => btn.addEventListener('click', () => {
+        openExerciseSwap(btn.dataset.revisar, profile);
+      }));
     }
   };
+}
+
+// Exercícios únicos do programa atual (o mesmo movimento pode repetir em mais de um dia).
+function programExercises(program) {
+  const seen = new Set();
+  const out = [];
+  for (const day of program.days) {
+    for (const ex of day.exercises) {
+      if (seen.has(ex.id)) continue;
+      seen.add(ex.id);
+      out.push(ex);
+    }
+  }
+  return out;
+}
+
+function openExerciseSwap(exerciseId, profile) {
+  const alts = alternatives(exerciseId, profile.equipment);
+  if (!alts.length) return toast('Sem alternativas cadastradas para este movimento.');
+  sheet(`
+    <h2>Trocar exercício</h2>
+    <p class="muted">Esta troca vale para todos os treinos da semana que usam este movimento, a partir de agora.</p>
+    ${alts.map(a => `<button class="block" style="justify-content:flex-start;margin:8px 0" data-alt="${esc(a.id)}">
+      <span style="text-align:left"><b>${esc(a.name)}</b><br><span class="dim tiny">${esc(a.feel)}</span></span></button>`).join('')}
+    <button class="ghost block mt" data-close>Cancelar</button>`, {
+    onMount(sheetEl) {
+      sheetEl.querySelectorAll('[data-alt]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const novo = alts.find(a => a.id === btn.dataset.alt);
+          swapProgramExercise(exerciseId, novo);
+          closeSheet();
+          toast('Exercício trocado no programa.');
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+        });
+      });
+    }
+  });
 }
 
 /**
