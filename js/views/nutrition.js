@@ -8,7 +8,7 @@ import { suggestions } from '../engine/mealSuggest.js';
 import { supplementsFor } from '../data/supplements.js';
 import { dayForWeekday } from '../engine/program.js';
 import { weekdayIndex } from '../core/util.js';
-import { searchFoods, portion, FOODS } from '../data/foods.js';
+import { searchFoods, portion, FOODS, handPortion, handRef, HAND_SIZES, PLATE_GROUPS, platePortion } from '../data/foods.js';
 import { coach, progressBar, sheet, closeSheet, field } from '../ui.js';
 import { signed } from '../core/util.js';
 
@@ -219,7 +219,7 @@ function adjustmentCard(snap, data) {
 /* ---------- Registro de refeição ---------- */
 
 function openFoodSheet(date, plan) {
-  const state = { food: null, amount: 100, useUnit: false, mealName: plan[0]?.name || 'Refeição' };
+  const state = { food: null, amount: 100, mode: 'g', handSize: 'm', handCount: 1, mealName: plan[0]?.name || 'Refeição' };
 
   const listHtml = term => searchFoods(term).slice(0, 40).map(f => `
     <button class="block" style="justify-content:space-between;margin:6px 0" data-food="${esc(f.name)}">
@@ -231,8 +231,9 @@ function openFoodSheet(date, plan) {
     <div id="foodStep">
       ${field('Refeição', `<select name="mealName">${plan.map(p => `<option>${esc(p.name)}</option>`).join('')}<option>Extra</option></select>`)}
       ${field('Buscar alimento', '<input name="q" placeholder="frango, arroz, whey..." autocomplete="off">')}
-      <div id="foodList" style="max-height:44vh;overflow:auto">${listHtml('')}</div>
-      <button class="ghost block mt" data-manual>Registrar manualmente (kcal e macros)</button>
+      <div id="foodList" style="max-height:38vh;overflow:auto">${listHtml('')}</div>
+      <button class="ghost block mt" data-prato>🍽 Monte seu prato (sem balança, sem procurar alimento)</button>
+      <button class="ghost block" data-manual>Registrar manualmente (kcal e macros)</button>
     </div>`, {
     onMount(sheetEl) {
       const q = sheetEl.querySelector('[name="q"]');
@@ -243,8 +244,8 @@ function openFoodSheet(date, plan) {
       const bindFoods = () => list.querySelectorAll('[data-food]').forEach(btn => {
         btn.addEventListener('click', () => {
           state.food = FOODS.find(f => f.name === btn.dataset.food);
-          state.useUnit = !!state.food.unit;
-          state.amount = state.useUnit ? 1 : 100;
+          state.mode = state.food.unit ? 'unit' : 'g';
+          state.amount = state.mode === 'unit' ? 1 : 100;
           renderAmount(sheetEl, state, date);
         });
       });
@@ -252,24 +253,53 @@ function openFoodSheet(date, plan) {
 
       q.addEventListener('input', () => { list.innerHTML = listHtml(q.value); bindFoods(); });
       sheetEl.querySelector('[data-manual]').addEventListener('click', () => renderManual(sheetEl, state, date));
+      sheetEl.querySelector('[data-prato]').addEventListener('click', () => renderPlate(sheetEl, state, date));
     }
   });
 }
 
 function renderAmount(sheetEl, state, date) {
   const f = state.food;
+  const hand = handRef(f);
   const step = sheetEl.querySelector('#foodStep');
+
+  const currentPortion = () => {
+    if (state.mode === 'hand') return handPortion(f, state.handSize, state.handCount);
+    return portion(f, state.amount, state.mode === 'unit');
+  };
+
+  const amountField = () => {
+    if (state.mode === 'hand') {
+      const size = HAND_SIZES.find(s => s.id === state.handSize) || HAND_SIZES[1];
+      return `
+        ${field(`Tamanho da porção (${esc(hand.label)})`, `<div class="chips">
+          ${HAND_SIZES.map(s => `<button type="button" class="chip sm ${s.id === state.handSize ? 'on' : ''}" data-hand-size="${s.id}">${esc(s.label)}</button>`).join('')}
+        </div>`)}
+        ${field('Quantas', `<div class="row tight">
+          <button type="button" class="sm ghost" data-hand-count="-1">−</button>
+          <b style="min-width:24px;text-align:center">${state.handCount}</b>
+          <button type="button" class="sm ghost" data-hand-count="1">+</button>
+        </div>`)}
+        <p class="dim tiny">1 porção ≈ ${Math.round(hand.grams * size.mult)} g — ${esc(hand.ref)}.</p>`;
+    }
+    if (state.mode === 'unit') {
+      return field(`Quantidade (${esc(f.unit.label)})`,
+        `<input type="number" inputmode="decimal" name="amount" value="${state.amount}" step="0.5" min="0">`);
+    }
+    return field('Quantidade (g)', `<input type="number" inputmode="decimal" name="amount" value="${state.amount}" step="10" min="0">`);
+  };
+
   const draw = () => {
-    const p = portion(f, state.amount, state.useUnit);
+    const p = currentPortion();
     step.innerHTML = `
       <button class="link" data-voltar>← trocar alimento</button>
       <h3>${esc(f.name)}</h3>
-      ${f.unit ? `<div class="chips mb">
-        <button class="chip sm ${state.useUnit ? 'on' : ''}" data-modo="unit">${esc(f.unit.label)}</button>
-        <button class="chip sm ${state.useUnit ? '' : 'on'}" data-modo="g">gramas</button>
-      </div>` : ''}
-      ${field(state.useUnit ? `Quantidade (${esc(f.unit.label)})` : 'Quantidade (g)',
-        `<input type="number" inputmode="decimal" name="amount" value="${state.amount}" step="${state.useUnit ? 0.5 : 10}" min="0">`)}
+      <div class="chips mb">
+        ${f.unit ? `<button class="chip sm ${state.mode === 'unit' ? 'on' : ''}" data-modo="unit">${esc(f.unit.label)}</button>` : ''}
+        <button class="chip sm ${state.mode === 'g' ? 'on' : ''}" data-modo="g">gramas</button>
+        <button class="chip sm ${state.mode === 'hand' ? 'on' : ''}" data-modo="hand">sem balança</button>
+      </div>
+      ${amountField()}
       <div class="metrics mb">
         <div class="metric"><b>${p.kcal}</b><span>kcal</span></div>
         <div class="metric"><b>${p.protein}</b><span>proteína</span></div>
@@ -279,24 +309,83 @@ function renderAmount(sheetEl, state, date) {
 
     step.querySelector('[data-voltar]').addEventListener('click', () => { closeSheet(); });
     step.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
-      state.useUnit = b.dataset.modo === 'unit';
-      state.amount = state.useUnit ? 1 : 100;
+      state.mode = b.dataset.modo;
+      if (state.mode === 'unit') state.amount = 1;
+      if (state.mode === 'g') state.amount = 100;
       draw();
     }));
-    step.querySelector('[name="amount"]').addEventListener('input', e => {
+    step.querySelector('[name="amount"]')?.addEventListener('input', e => {
       state.amount = num(e.target.value) ?? 0;
-      const np = portion(f, state.amount, state.useUnit);
+      const np = currentPortion();
       const metrics = step.querySelectorAll('.metric b');
       metrics[0].textContent = np.kcal;
       metrics[1].textContent = np.protein;
       metrics[2].textContent = np.carbs;
     });
+    step.querySelectorAll('[data-hand-size]').forEach(b => b.addEventListener('click', () => {
+      state.handSize = b.dataset.handSize;
+      draw();
+    }));
+    step.querySelectorAll('[data-hand-count]').forEach(b => b.addEventListener('click', () => {
+      state.handCount = Math.max(1, Math.min(8, state.handCount + (+b.dataset.handCount)));
+      draw();
+    }));
     step.querySelector('[data-confirmar]').addEventListener('click', () => {
-      const final = portion(f, state.amount, state.useUnit);
-      addMeal(date, {
-        name: `${state.mealName} · ${f.name} ${state.useUnit ? `${state.amount} ${f.unit.label}` : `${final.grams} g`}`,
-        ...final
-      });
+      const final = currentPortion();
+      const desc = state.mode === 'unit' ? `${state.amount} ${f.unit.label}`
+        : state.mode === 'hand' ? `${final.count} ${final.size.label.toLowerCase()} ${hand.label}(s) (~${final.grams} g)`
+          : `${final.grams} g`;
+      addMeal(date, { name: `${state.mealName} · ${f.name} ${desc}`, ...final });
+      closeSheet();
+      toast('Refeição registrada.');
+    });
+  };
+  draw();
+}
+
+/**
+ * Monte seu prato: sem escolher um alimento nem pesar nada, só contando
+ * porções pela mão por grupo (proteína, carbo, gordura, vegetal). Método de
+ * porções pela mão — a própria mão escala com quem come, então serve como
+ * régua sem balança.
+ */
+function renderPlate(sheetEl, state, date) {
+  const step = sheetEl.querySelector('#foodStep');
+  const counts = { protein: 1, carb: 1, fat: 0, veg: 1 };
+
+  const draw = () => {
+    const p = platePortion(counts);
+    step.innerHTML = `
+      <button class="link" data-voltar>← trocar alimento</button>
+      <h3>Monte seu prato</h3>
+      <p class="muted">Conte quantas porções de cada grupo têm no prato, usando a mão como régua.</p>
+      ${PLATE_GROUPS.map(g => `
+        <div class="stat-line">
+          <div style="flex:1"><b>${esc(g.label)}</b><div class="dim tiny">1 ${esc(g.unit)} · ${esc(g.hint)}</div></div>
+          <div class="row tight">
+            <button type="button" class="sm ghost" data-plate="${g.id}:-1">−</button>
+            <b style="min-width:20px;text-align:center">${counts[g.id]}</b>
+            <button type="button" class="sm ghost" data-plate="${g.id}:1">+</button>
+          </div>
+        </div>`).join('')}
+      <div class="metrics mb mt">
+        <div class="metric"><b>${p.kcal}</b><span>kcal</span></div>
+        <div class="metric"><b>${p.protein}</b><span>proteína</span></div>
+        <div class="metric"><b>${p.carbs}</b><span>carbo</span></div>
+      </div>
+      <button class="primary block" data-confirmar>Adicionar em ${esc(state.mealName)}</button>`;
+
+    step.querySelector('[data-voltar]').addEventListener('click', () => { closeSheet(); });
+    step.querySelectorAll('[data-plate]').forEach(b => b.addEventListener('click', () => {
+      const [id, delta] = b.dataset.plate.split(':');
+      counts[id] = Math.max(0, Math.min(8, counts[id] + (+delta)));
+      draw();
+    }));
+    step.querySelector('[data-confirmar]').addEventListener('click', () => {
+      const final = platePortion(counts);
+      if (!final.kcal) return toast('Adicione ao menos uma porção.');
+      const desc = PLATE_GROUPS.filter(g => counts[g.id] > 0).map(g => `${counts[g.id]}× ${g.label.toLowerCase()}`).join(' · ');
+      addMeal(date, { name: `${state.mealName} · ${desc}`, ...final });
       closeSheet();
       toast('Refeição registrada.');
     });

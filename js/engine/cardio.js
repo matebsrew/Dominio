@@ -98,6 +98,103 @@ export function zone2Guide(profile) {
   };
 }
 
+/**
+ * Guia estruturado por modalidade: frequência cardíaca não serve para tudo —
+ * na água ela aparece mais baixa (reflexo de mergulho) e em bike/remo cadência
+ * e resistência dizem mais que o número do monitor. Cada tipo ganha aquecimento,
+ * parte principal e volta à calma, em vez de só "minutos" soltos.
+ */
+export function sessionSteps(typeId, minutes) {
+  const total = Math.max(10, minutes || 25);
+  const warm = clamp(Math.round(total * 0.15), 4, 8);
+  const cool = clamp(Math.round(total * 0.12), 3, 6);
+  const main = Math.max(5, total - warm - cool);
+  const reps = (short, mid, long) => total <= 20 ? short : total <= 35 ? mid : long;
+
+  const plans = {
+    caminhada: {
+      metric: 'Frequência cardíaca (teste de fala)',
+      tip: 'É a modalidade mais fácil de dosar: se dá para conversar frases inteiras sem ofegar, está na zona certa.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'ritmo bem leve, quase passeio' },
+        { label: 'Principal', min: main, detail: 'ritmo que permite conversar frases inteiras — se começar a ofegar, reduza o passo' },
+        { label: 'Volta à calma', min: cool, detail: 'reduza o ritmo nos últimos minutos' }
+      ]
+    },
+    esteira_inclinada: {
+      metric: 'Inclinação + frequência cardíaca',
+      tip: 'A inclinação empurra o gasto calórico sem o impacto da corrida — é ela que faz a sessão valer, não a velocidade.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'sem inclinação, ritmo leve' },
+        { label: 'Principal', min: main, detail: 'inclinação 8–15%, ritmo em que ainda dá para falar frases curtas' },
+        { label: 'Volta à calma', min: cool, detail: 'inclinação zero, ritmo leve' }
+      ]
+    },
+    bike: {
+      metric: 'Cadência (RPM) + resistência',
+      tip: 'Cadência conta mais que velocidade: ajuste a resistência até o esforço ficar moderado na cadência-alvo, em vez de pedalar rápido com pouca resistência.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'cadência 70–80 rpm, resistência leve' },
+        { label: 'Principal', min: main, detail: 'cadência 80–90 rpm, resistência moderada — dá para falar frases, não para cantar' },
+        { label: 'Volta à calma', min: cool, detail: 'cadência baixa, resistência leve' }
+      ]
+    },
+    eliptico: {
+      metric: 'Frequência cardíaca / esforço percebido',
+      tip: 'Empurre com braços e pernas junto — só as pernas deixa o gasto bem abaixo do que o aparelho mostra.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'ritmo leve, braços soltos' },
+        { label: 'Principal', min: main, detail: 'ritmo moderado, braços empurrando ativamente' },
+        { label: 'Volta à calma', min: cool, detail: 'ritmo leve' }
+      ]
+    },
+    remo: {
+      metric: 'Remadas por minuto (SPM)',
+      tip: 'A potência vem das pernas primeiro, tronco depois, braços por último — nessa ordem no puxão e ao contrário na volta.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: '18–20 spm, puxada leve' },
+        { label: 'Principal', min: main, detail: reps(
+          '3 blocos de 4 min a 22–26 spm, com 1 min bem leve entre eles',
+          '4 blocos de 5 min a 22–26 spm, com 1 min bem leve entre eles',
+          '5 blocos de 6 min a 22–26 spm, com 1 min bem leve entre eles') },
+        { label: 'Volta à calma', min: cool, detail: '16–18 spm, puxada bem leve' }
+      ]
+    },
+    corrida: {
+      metric: 'Frequência cardíaca (teste de fala)',
+      tip: 'Corrida intensa é a que mais compete com o treino de perna — mantenha em zona 2 na maioria das sessões.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'trote bem leve ou caminhada rápida' },
+        { label: 'Principal', min: main, detail: 'ritmo em que dá para falar frases curtas, sem ofegar' },
+        { label: 'Volta à calma', min: cool, detail: 'caminhada' }
+      ]
+    },
+    natacao: {
+      metric: 'Esforço percebido (RPE) — não a frequência cardíaca',
+      tip: 'Na água a frequência cardíaca aparece de 10 a 13 bpm mais baixa que em terra (reflexo de mergulho): o monitor engana. Guie-se pela respiração e pelo esforço percebido, não pelo número.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'nado livre bem leve, sem pressa' },
+        { label: 'Principal', min: main, detail: reps(
+          '6 a 8 tiros de 50 m em ritmo moderado, 15–20 s de descanso entre eles',
+          '10 a 12 tiros de 50 m em ritmo moderado, 15–20 s de descanso entre eles',
+          '14 a 18 tiros de 50 m em ritmo moderado, 15–20 s de descanso entre eles') },
+        { label: 'Volta à calma', min: cool, detail: 'nado bem leve, respiração tranquila' }
+      ]
+    },
+    esporte: {
+      metric: 'Esforço percebido (RPE)',
+      tip: 'Esporte coletivo já intervala esforço sozinho — o que importa é começar e terminar abaixo do pico de intensidade do jogo.',
+      steps: [
+        { label: 'Aquecimento', min: warm, detail: 'deslocamento leve + mobilidade das articulações que mais usa no esporte' },
+        { label: 'Principal', min: main, detail: 'o jogo em si — intensidade varia naturalmente' },
+        { label: 'Volta à calma', min: cool, detail: 'caminhada leve + alongamento' }
+      ]
+    }
+  };
+
+  return plans[typeId] || plans.esporte;
+}
+
 export function weekMinutes(activity, days) {
   let total = 0;
   for (const day of days) {

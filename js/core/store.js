@@ -316,6 +316,21 @@ export function setProgram(program) {
   persist();
 }
 
+// Troca definitiva de um exercício no programa (não só na sessão do dia) —
+// usada na revisão de fim de mesociclo, quando um exercício estagnou ou dói.
+export function swapProgramExercise(oldId, newExercise) {
+  const d = pdata();
+  if (!d.program) return;
+  for (const day of d.program.days) {
+    day.exercises = day.exercises.map(ex => ex.id === oldId
+      ? { ...ex, id: newExercise.id, name: newExercise.name, primary: newExercise.primary,
+          secondary: newExercise.secondary, pattern: newExercise.pattern, type: newExercise.type,
+          reps: newExercise.reps, rest: newExercise.rest }
+      : ex);
+  }
+  persist();
+}
+
 export function updateSettings(fields) {
   Object.assign(pdata().settings, fields);
   persist();
