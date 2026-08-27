@@ -8,7 +8,9 @@ import { sessionPlan } from '../engine/readiness.js';
 import { phase, setsThisWeek, deloadPrescription } from '../engine/mesocycle.js';
 import { estimateLoad, warmupSets } from '../engine/loading.js';
 import { conflictsWith, saferAlternatives, REGIONS } from '../data/joints.js';
+import { muscleLabel } from '../data/muscles.js';
 import { musclesOf } from '../engine/feedback.js';
+import { overCap } from '../engine/program.js';
 import { BY_ID, alternatives } from '../data/exercises.js';
 import { guideHtml, bindGuides } from '../components/guide.js';
 import { coach, sheet, closeSheet, confirmSheet } from '../ui.js';
@@ -44,6 +46,7 @@ export function render({ profile, params, go }) {
   const ph = phase(profile, data.settings);
   const isDeload = ph.isDeload;
   const pain = data.settings.pain || {};
+  const bodyweight = data.body.find(b => Number.isFinite(b.weight))?.weight || profile.weightKg || 0;
 
   const draft = loadDraft(profile.id, day.name) || {
     profileId: profile.id, day: day.name, date: today(), startedAt: Date.now(),
@@ -74,8 +77,11 @@ export function render({ profile, params, go }) {
     html: `
       ${plan.score !== null ? coach(plan.title, plan.message, plan.band.tone) : ''}
       ${isDeload ? coach('Deload', deloadPrescription(data.settings).text, 'violet') : ''}
+      ${overCap(exercises.map(e => ({ primary: e.primary, sets: e.plannedSets }))).map(o =>
+        coach('Muitas séries num músculo só',
+          `${o.sets} séries de ${muscleLabel(o.muscle).toLowerCase()} nesta sessão. Acima de 8 a fadiga derruba a qualidade das últimas séries — o ganho por série cai. Considere levar parte desse volume para outro dia.`, 'warn')).join('')}
       <div id="exercises">
-        ${exercises.map((ex, i) => exerciseCard(ex, i, data, plan, ph, draft, profile, pain)).join('')}
+        ${exercises.map((ex, i) => exerciseCard(ex, i, data, plan, ph, draft, profile, pain, bodyweight)).join('')}
       </div>
       <div class="card">
         <label>Como foi o treino? (opcional)</label>
@@ -171,9 +177,9 @@ export function render({ profile, params, go }) {
   };
 }
 
-function exerciseCard(ex, index, data, plan, ph, draft, profile, pain) {
+function exerciseCard(ex, index, data, plan, ph, draft, profile, pain, bodyweight) {
   const meta = BY_ID[ex.id] || ex;
-  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload });
+  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload, bodyweight });
   const saved = draft.sets?.[ex.id] || [];
   const count = Math.max(ex.plannedSets, saved.length);
   const conflicts = conflictsWith(ex.id, pain);
@@ -191,8 +197,10 @@ function exerciseCard(ex, index, data, plan, ph, draft, profile, pain) {
 
     <div class="coach ${s.kind === 'subir' ? 'good' : s.kind === 'reduzir' || s.kind === 'segurar' ? 'warn' : ''}">
       <b>${esc(s.headline)}</b>${esc(s.detail)}
+      ${s.repsTarget ? `<div class="tiny" style="margin-top:6px;color:var(--brass)">Meta de hoje: ${s.repsTarget} repetições nessa carga rendem cerca de 2% de sobrecarga.</div>` : ''}
       ${s.warning ? `<div class="tiny" style="margin-top:6px;color:var(--warn)">${esc(s.warning)}</div>` : ''}
     </div>
+    ${s.overloadLabel ? `<div class="overload ${s.overloadLabel.tone}">${esc(s.overloadLabel.text)}</div>` : ''}
     ${s.last ? `<div class="dim tiny">Última sessão (${esc(s.last.date)}): ${esc(describeSets(s.last.sets))}</div>` : ''}
     ${estimate ? `<div class="dim tiny">${esc(estimate.text)}${estimate.caveat ? ' ' + esc(estimate.caveat) : ''}</div>` : ''}
     ${warmups.length ? `<div class="warmup">

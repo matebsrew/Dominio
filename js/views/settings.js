@@ -5,6 +5,7 @@ import { activeProfile, updateProfile, pdata, setProgram, deleteProfile, exportA
 import { generateProgram } from '../engine/program.js';
 import { ACTIVITY_LABEL, GOAL_LABEL, calorieTarget, macros } from '../engine/energy.js';
 import { EQUIPMENT_LABEL } from '../data/exercises.js';
+import { PRIORITY_MUSCLES } from '../data/muscles.js';
 import { field, selectHtml, confirmSheet, coach, sheet, closeSheet } from '../ui.js';
 import { targetsFor } from '../engine/diary.js';
 
@@ -29,6 +30,10 @@ export function render({ profile, go }) {
           ${field('Peso desejado (kg)', `<input type="number" step="0.1" name="targetWeightKg" value="${profile.targetWeightKg ?? ''}">`)}
         </div>
         ${field('Objetivo', selectHtml('goal', Object.entries(GOAL_LABEL).map(([value, label]) => ({ value, label })), profile.goal))}
+        ${field('Prioridade do momento', selectHtml('priorityMuscle', [
+          { value: '', label: 'Nada em especial — equilibrado' },
+          ...PRIORITY_MUSCLES
+        ], profile.priorityMuscle || ''), 'Vai primeiro na sessão, com você descansado.')}
         ${field('Experiência', selectHtml('experience', [
           { value: 'iniciante', label: 'Iniciante' },
           { value: 'intermediario', label: 'Intermediário' },

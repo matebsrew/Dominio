@@ -4,6 +4,9 @@
 import { esc, fmt, formatDate, weekStart, addDays, today, minutesLabel, bars, clamp, toast } from '../core/util.js';
 import { pdata, saveFeedback, applyVolumeBias, updateSettings } from '../core/store.js';
 import { weeklyReview, scoreLabel } from '../engine/coach.js';
+import { frequencyPerMuscle } from '../engine/progression.js';
+import { BY_ID } from '../data/exercises.js';
+import { muscleLabel } from '../data/muscles.js';
 import { RSM_QUESTIONS, rsmScore, pendingFeedback, readRsm } from '../engine/feedback.js';
 import { startDeload, phase, mesoLength } from '../engine/mesocycle.js';
 import { MUSCLES } from '../data/muscles.js';
@@ -80,6 +83,7 @@ export function render({ profile, go }) {
           target: v.window ? [v.window.min, v.window.max] : v.mav,
           tone: v.value >= v.mrv ? 'bad' : v.window && v.value >= v.window.min ? 'good' : v.value > 0 ? 'warn' : ''
         })))}
+        ${freqCard(data, viewWeek)}
         <p class="dim tiny mt">A faixa verde é o alvo <b>desta semana do mesociclo</b> — ela sobe a cada semana, do volume mínimo até o topo da faixa produtiva, e cai no deload.</p>
       </div>
 
@@ -129,6 +133,26 @@ export function render({ profile, go }) {
       }));
     }
   };
+}
+
+/**
+ * Frequência importa tanto quanto volume: as mesmas 10 séries divididas em dois
+ * dias rendem mais que 10 séries de uma vez, porque cada série sai com menos
+ * fadiga acumulada (BuffBook 5.5.2).
+ */
+function freqCard(data, weekKey) {
+  const freq = frequencyPerMuscle(data.sessions || [], weekKey, BY_ID);
+  const entradas = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+  if (!entradas.length) return '';
+  const umaVez = entradas.filter(([, n]) => n === 1).map(([m]) => muscleLabel(m).toLowerCase());
+  return `<div class="mt">
+    <div class="eyebrow mb">Frequência na semana</div>
+    <div class="chips">
+      ${entradas.map(([m, n]) => `<span class="chip sm ${n >= 2 ? 'on' : ''}">${esc(muscleLabel(m))} ${n}×</span>`).join('')}
+    </div>
+    ${umaVez.length ? `<p class="dim tiny mt">${umaVez.join(', ')} ${umaVez.length > 1 ? 'foram treinados' : 'foi treinado'} só uma vez.
+      Duas a três vezes por semana costuma render mais que a mesma quantidade de séries num dia só.</p>` : ''}
+  </div>`;
 }
 
 function line(label, value, pct) {

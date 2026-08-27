@@ -30,6 +30,7 @@
   --warn:       #DCA65C;
   --bad:        #D8796C;
   --violet:     #A594D6;
+  --steel:      #7E90AB;
 
   --accent:     var(--brass);
   --accent-ink: var(--brass-ink);
@@ -460,6 +461,36 @@ button.sm.warn { background: var(--warn); color: #1D1305; border-color: transpar
 .timer-fab strong { font-family: var(--serif); font-weight: 400; font-size: 30px; letter-spacing: .01em; display: block; line-height: 1.1; }
 .timer-fab.done strong { color: var(--good); }
 
+.overload {
+  margin-top: 6px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .06em; color: var(--dim);
+}
+.overload.good { color: var(--good); }
+.overload.warn { color: var(--warn); }
+
+.plateau {
+  margin-top: 10px; border: 1px solid rgba(220,166,92,.22);
+  border-radius: var(--r-sm); background: rgba(220,166,92,.04); padding: 10px 12px;
+}
+.plateau summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--warn);
+  list-style: none;
+}
+.plateau summary::-webkit-details-marker { display: none; }
+.plateau summary::before { content: '▸ '; }
+.plateau[open] summary::before { content: '▾ '; }
+.plateau-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.plateau-step:last-of-type { border-bottom: 0; }
+.plateau-step b { font-size: 13px; font-weight: 600; display: block; margin-bottom: 3px; color: var(--muted); }
+.plateau-step.on b { color: var(--text); }
+.plateau-n {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; margin-top: 1px;
+  background: rgba(233,228,216,.06); border: 1px solid var(--line);
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+}
+.plateau-step.on .plateau-n { background: var(--warn); border-color: transparent; color: #1D1305; font-weight: 700; }
+
 /* ---------- Guia de execução ---------- */
 .guide {
   margin-top: 12px; border: 1px solid var(--line-soft); border-radius: var(--r-md);
@@ -492,16 +523,24 @@ button.sm.warn { background: var(--warn); color: #1D1305; border-color: transpar
 
 /* A faixa do atlas: o corpo grande o bastante para o músculo ser visível. */
 .guide-atlas {
-  display: grid; grid-template-columns: 92px 1fr; gap: 14px; align-items: center;
-  margin: 2px 10px 0; padding: 12px;
+  margin: 2px 10px 0; padding: 14px 10px 12px;
   border-radius: var(--r-sm);
-  background: linear-gradient(100deg, rgba(198,161,94,.07), transparent 70%);
+  background: linear-gradient(180deg, rgba(198,161,94,.05), transparent 65%);
   border: 1px solid var(--line-soft);
 }
-.atlas-fig { height: 158px; display: grid; place-items: center; }
-.atlas-info { min-width: 0; }
-.atlas-info b { display: block; font-size: 17px; font-weight: 600; color: var(--brass); margin: 4px 0 6px; }
+.atlas-fig { display: grid; place-items: center; }
+.atlas-fig .anat { width: 100%; height: auto; max-height: 260px; }
+.atlas-fig text { font-family: var(--mono); letter-spacing: .02em; }
+.atlas-info { margin-top: 10px; }
 .atlas-info p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.atlas-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.atlas-legend span {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; color: var(--dim);
+}
+.dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; flex: none; }
+.dot.primary { background: var(--brass); }
+.dot.secondary { background: var(--steel); }
 .frame figcaption {
   padding: 4px 0 6px; text-align: center;
   border-top: 1px solid var(--line-soft);

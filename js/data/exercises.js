@@ -1,6 +1,8 @@
 // Catálogo de exercícios.
 //
 // primary/secondary   -> chaves de muscles.js (secundário conta como meia série)
+// bw                  -> fração do peso corporal que o exercício carrega, para que
+//                        barra fixa e flexão entrem na conta de progressão
 // pattern             -> usado pelo gerador de programa para montar sessões equilibradas
 // equip               -> barra | halter | maquina | cabo | smith | livre | elastico | kettlebell
 // slug                -> pasta de imagens do movimento (@bryllim/workout-guide)
@@ -66,7 +68,7 @@ export const EXERCISES = [
   }),
   E('crucifixo-cabo', 'Crucifixo no Cabo', {
     primary: 'peito', pattern: 'peito_iso', type: 'isolado',
-    equip: 'cabo', slug: 'cable-fly', reps: [12, 15], rest: 90,
+    equip: 'cabo', slug: 'cable-fly', reps: [10, 14], rest: 150,
     feel: 'Peito esticando na abertura e contraindo ao fechar.',
     setup: 'Um pé à frente, tronco levemente inclinado, cotovelos semiflexionados fixos.',
     exec: 'Abra até alongar sem desconforto e feche cruzando levemente à frente do corpo.',
@@ -74,7 +76,7 @@ export const EXERCISES = [
   }),
   E('peck-deck', 'Peck Deck / Voador', {
     primary: 'peito', pattern: 'peito_iso', type: 'isolado',
-    equip: 'maquina', slug: 'pec-deck', reps: [12, 15], rest: 90,
+    equip: 'maquina', slug: 'pec-deck', reps: [10, 14], rest: 150,
     feel: 'Peito na linha do esterno.',
     setup: 'Ajuste o banco para que as mãos fiquem na altura do peito.',
     exec: 'Feche conduzindo pelos cotovelos e volte controlando o alongamento.',
@@ -82,30 +84,30 @@ export const EXERCISES = [
   }),
   E('crucifixo-halteres', 'Crucifixo com Halteres', {
     primary: 'peito', pattern: 'peito_iso', type: 'isolado',
-    equip: 'halter', slug: 'dumbbell-fly', reps: [12, 15], rest: 90,
+    equip: 'halter', slug: 'dumbbell-fly', reps: [10, 14], rest: 150,
     feel: 'Alongamento do peito na descida.',
     setup: 'Deitado, cotovelos levemente flexionados e fixos.',
     exec: 'Abra os braços em arco até a altura do peito e feche contraindo.',
     avoid: 'Descer muito com carga alta — risco no ombro.'
   }),
   E('flexao', 'Flexão de Braço', {
-    primary: 'peito', secondary: ['triceps', 'ombro_ant', 'core'], pattern: 'peito_horizontal',
-    equip: 'livre', slug: 'push-up', reps: [8, 20], rest: 90,
+    bw: 0.64, primary: 'peito', secondary: ['triceps', 'ombro_ant', 'core'], pattern: 'peito_horizontal',
+    equip: 'livre', slug: 'push-up', reps: [8, 14], rest: 120,
     feel: 'Peito e tríceps, com core estabilizando.',
     setup: 'Mãos pouco mais largas que os ombros, corpo em linha reta.',
     exec: 'Desça até o peito perto do chão e empurre mantendo o quadril alinhado.',
     avoid: 'Deixar o quadril cair ou subir.'
   }),
   E('flexao-inclinada', 'Flexão com Mãos Elevadas', {
-    primary: 'peito', secondary: ['triceps', 'ombro_ant'], pattern: 'peito_horizontal',
-    equip: 'livre', slug: 'incline-push-up', reps: [10, 20], rest: 90,
+    bw: 0.45, primary: 'peito', secondary: ['triceps', 'ombro_ant'], pattern: 'peito_horizontal',
+    equip: 'livre', slug: 'incline-push-up', reps: [10, 15], rest: 120,
     feel: 'Peito, com menos carga que a flexão no chão.',
     setup: 'Mãos numa bancada, mesa ou banco firme.',
     exec: 'Desça o peito até perto do apoio e empurre.',
     avoid: 'Apoio instável.'
   }),
   E('mergulho-paralelas', 'Mergulho nas Paralelas', {
-    primary: 'peito', secondary: ['triceps', 'ombro_ant'], pattern: 'peito_horizontal',
+    bw: 1.0, primary: 'peito', secondary: ['triceps', 'ombro_ant'], pattern: 'peito_horizontal',
     equip: 'livre', slug: 'chest-dip', reps: [6, 12], rest: 150, level: 'intermediario',
     feel: 'Peito inferior e tríceps.',
     setup: 'Tronco levemente inclinado à frente, ombros longe das orelhas.',
@@ -131,7 +133,7 @@ export const EXERCISES = [
     avoid: 'Encolher os ombros no início da puxada.'
   }),
   E('barra-fixa', 'Barra Fixa', {
-    primary: 'dorsais', secondary: ['biceps', 'core'], pattern: 'costas_vertical',
+    bw: 1.0, primary: 'dorsais', secondary: ['biceps', 'core'], pattern: 'costas_vertical',
     equip: 'livre', slug: 'pull-up', reps: [4, 10], rest: 180, level: 'intermediario',
     feel: 'Dorsais e bíceps.',
     setup: 'Pegada pronada na largura dos ombros, corpo sem balanço.',
@@ -187,8 +189,8 @@ export const EXERCISES = [
     avoid: 'Encolher os ombros durante a puxada.'
   }),
   E('remada-invertida', 'Remada Invertida', {
-    primary: 'dorsais', secondary: ['ombro_post', 'biceps', 'core'], pattern: 'costas_horizontal',
-    equip: 'livre', slug: 'inverted-row', reps: [8, 15], rest: 120,
+    bw: 0.5, primary: 'dorsais', secondary: ['ombro_post', 'biceps', 'core'], pattern: 'costas_horizontal',
+    equip: 'livre', slug: 'inverted-row', reps: [8, 14], rest: 120,
     feel: 'Meio das costas, usando o peso do corpo.',
     setup: 'Barra na altura do quadril, corpo em linha reta.',
     exec: 'Puxe o peito em direção à barra e desça controlando.',
@@ -196,7 +198,7 @@ export const EXERCISES = [
   }),
   E('pulldown-braco-reto', 'Pulldown com Braços Estendidos', {
     primary: 'dorsais', pattern: 'costas_iso', type: 'isolado',
-    equip: 'cabo', slug: 'straight-arm-pulldown', reps: [12, 15], rest: 90,
+    equip: 'cabo', slug: 'straight-arm-pulldown', reps: [10, 14], rest: 150,
     feel: 'Dorsal isolado, sem participação do bíceps.',
     setup: 'Tronco levemente inclinado, braços quase estendidos.',
     exec: 'Leve a barra até as coxas mantendo os cotovelos fixos.',
@@ -230,7 +232,7 @@ export const EXERCISES = [
   }),
   E('elevacao-lateral', 'Elevação Lateral com Halteres', {
     primary: 'ombro_lat', pattern: 'ombro_lateral', type: 'isolado',
-    equip: 'halter', slug: 'lateral-raise', reps: [12, 20], rest: 75,
+    equip: 'halter', slug: 'lateral-raise', reps: [10, 15], rest: 150,
     feel: 'Lateral do ombro — queimação na parte de fora do deltoide.',
     setup: 'Tronco firme, cotovelos levemente flexionados.',
     exec: 'Conduza pelos cotovelos até a altura dos ombros e desça controlando.',
@@ -238,7 +240,7 @@ export const EXERCISES = [
   }),
   E('elevacao-lateral-cabo', 'Elevação Lateral no Cabo', {
     primary: 'ombro_lat', pattern: 'ombro_lateral', type: 'isolado',
-    equip: 'cabo', slug: 'cable-lateral-raise', reps: [12, 20], rest: 75,
+    equip: 'cabo', slug: 'cable-lateral-raise', reps: [10, 15], rest: 150,
     feel: 'Lateral do ombro com tensão constante em toda a amplitude.',
     setup: 'Polia baixa, cabo cruzando à frente do corpo.',
     exec: 'Eleve até a altura do ombro e volte controlando.',
@@ -246,7 +248,7 @@ export const EXERCISES = [
   }),
   E('elevacao-lateral-maquina', 'Elevação Lateral na Máquina', {
     primary: 'ombro_lat', pattern: 'ombro_lateral', type: 'isolado',
-    equip: 'maquina', slug: 'machine-lateral-raise', reps: [12, 20], rest: 75,
+    equip: 'maquina', slug: 'machine-lateral-raise', reps: [10, 15], rest: 150,
     feel: 'Lateral do ombro, sem precisar estabilizar carga.',
     setup: 'Ajuste o assento para o eixo ficar na altura do ombro.',
     exec: 'Suba até a altura dos ombros e desça controlando.',
@@ -254,7 +256,7 @@ export const EXERCISES = [
   }),
   E('crucifixo-inverso', 'Crucifixo Inverso', {
     primary: 'ombro_post', secondary: ['trapezio'], pattern: 'ombro_posterior', type: 'isolado',
-    equip: 'maquina', slug: 'reverse-pec-deck', reps: [12, 20], rest: 75,
+    equip: 'maquina', slug: 'reverse-pec-deck', reps: [10, 15], rest: 150,
     feel: 'Parte de trás do ombro e meio das costas.',
     setup: 'Peito apoiado, braços na altura dos ombros.',
     exec: 'Abra conduzindo pelos cotovelos e volte controlando.',
@@ -262,7 +264,7 @@ export const EXERCISES = [
   }),
   E('face-pull', 'Face Pull no Cabo', {
     primary: 'ombro_post', secondary: ['trapezio'], pattern: 'ombro_posterior', type: 'isolado',
-    equip: 'cabo', slug: 'face-pull', reps: [12, 20], rest: 75,
+    equip: 'cabo', slug: 'face-pull', reps: [10, 15], rest: 150,
     feel: 'Ombro posterior e meio das costas — ótimo para saúde do ombro.',
     setup: 'Polia na altura do rosto, corda com pegada neutra.',
     exec: 'Puxe a corda em direção ao rosto abrindo as mãos e girando os ombros para fora.',
@@ -270,7 +272,7 @@ export const EXERCISES = [
   }),
   E('crucifixo-inverso-halteres', 'Crucifixo Inverso com Halteres', {
     primary: 'ombro_post', secondary: ['trapezio'], pattern: 'ombro_posterior', type: 'isolado',
-    equip: 'halter', slug: 'bent-over-rear-delt-raise', reps: [12, 20], rest: 75,
+    equip: 'halter', slug: 'bent-over-rear-delt-raise', reps: [10, 15], rest: 150,
     feel: 'Parte posterior do ombro.',
     setup: 'Tronco inclinado à frente, coluna neutra.',
     exec: 'Abra os braços na linha dos ombros e desça controlando.',
@@ -278,7 +280,7 @@ export const EXERCISES = [
   }),
   E('encolhimento', 'Encolhimento de Ombros', {
     primary: 'trapezio', pattern: 'trapezio', type: 'isolado',
-    equip: 'halter', slug: 'dumbbell-shrug', reps: [10, 15], rest: 90,
+    equip: 'halter', slug: 'dumbbell-shrug', reps: [10, 15], rest: 150,
     feel: 'Trapézio superior.',
     setup: 'Braços estendidos ao lado do corpo.',
     exec: 'Eleve os ombros em direção às orelhas e desça controlando.',
@@ -288,7 +290,7 @@ export const EXERCISES = [
   /* ---------------- BRAÇOS ---------------- */
   E('triceps-pulley', 'Tríceps na Polia com Barra', {
     primary: 'triceps', pattern: 'triceps', type: 'isolado',
-    equip: 'cabo', slug: 'tricep-pushdown', reps: [10, 15], rest: 75,
+    equip: 'cabo', slug: 'tricep-pushdown', reps: [10, 15], rest: 150,
     feel: 'Tríceps, principalmente na extensão final.',
     setup: 'Cotovelos junto ao corpo, tronco levemente inclinado.',
     exec: 'Estenda os cotovelos até o fim e volte controlando.',
@@ -296,7 +298,7 @@ export const EXERCISES = [
   }),
   E('triceps-corda', 'Tríceps Corda', {
     primary: 'triceps', pattern: 'triceps', type: 'isolado',
-    equip: 'cabo', slug: 'rope-tricep-pushdown', reps: [10, 15], rest: 75,
+    equip: 'cabo', slug: 'rope-tricep-pushdown', reps: [10, 15], rest: 150,
     feel: 'Tríceps, com contração forte ao abrir a corda no final.',
     setup: 'Cotovelos fixos ao lado do corpo.',
     exec: 'Estenda abrindo levemente a corda e volte controlando.',
@@ -304,7 +306,7 @@ export const EXERCISES = [
   }),
   E('triceps-testa', 'Tríceps Testa', {
     primary: 'triceps', pattern: 'triceps', type: 'isolado',
-    equip: 'barra', slug: 'skull-crusher', reps: [8, 12], rest: 90,
+    equip: 'barra', slug: 'skull-crusher', reps: [8, 12], rest: 150,
     feel: 'Tríceps, com alongamento na cabeça longa.',
     setup: 'Deitado, braços apontados levemente para trás.',
     exec: 'Flexione os cotovelos levando a barra até perto da testa e estenda.',
@@ -312,15 +314,15 @@ export const EXERCISES = [
   }),
   E('triceps-frances', 'Tríceps Francês com Halter', {
     primary: 'triceps', pattern: 'triceps', type: 'isolado',
-    equip: 'halter', slug: 'overhead-tricep-extension', reps: [10, 15], rest: 90,
+    equip: 'halter', slug: 'overhead-tricep-extension', reps: [10, 15], rest: 150,
     feel: 'Alongamento da cabeça longa do tríceps.',
     setup: 'Halter acima da cabeça, cotovelos apontando para cima.',
     exec: 'Desça atrás da cabeça e estenda sem mover os cotovelos.',
     avoid: 'Abrir os cotovelos para os lados.'
   }),
   E('mergulho-banco', 'Mergulho no Banco', {
-    primary: 'triceps', secondary: ['peito', 'ombro_ant'], pattern: 'triceps',
-    equip: 'livre', slug: 'bench-dip', reps: [8, 15], rest: 90,
+    bw: 0.55, primary: 'triceps', secondary: ['peito', 'ombro_ant'], pattern: 'triceps',
+    equip: 'livre', slug: 'bench-dip', reps: [8, 14], rest: 120,
     feel: 'Tríceps.',
     setup: 'Mãos na borda do banco, quadril próximo ao apoio.',
     exec: 'Desça flexionando os cotovelos e empurre de volta.',
@@ -328,7 +330,7 @@ export const EXERCISES = [
   }),
   E('rosca-direta', 'Rosca Direta', {
     primary: 'biceps', secondary: ['antebraco'], pattern: 'biceps', type: 'isolado',
-    equip: 'barra', slug: 'ez-bar-curl', reps: [8, 12], rest: 90,
+    equip: 'barra', slug: 'ez-bar-curl', reps: [8, 12], rest: 150,
     feel: 'Bíceps.',
     setup: 'Cotovelos próximos ao corpo, punhos firmes.',
     exec: 'Suba sem balançar o tronco e desça controlando toda a amplitude.',
@@ -336,7 +338,7 @@ export const EXERCISES = [
   }),
   E('rosca-alternada', 'Rosca Alternada com Halteres', {
     primary: 'biceps', secondary: ['antebraco'], pattern: 'biceps', type: 'isolado',
-    equip: 'halter', slug: 'bicep-curl', reps: [10, 15], rest: 75,
+    equip: 'halter', slug: 'bicep-curl', reps: [10, 15], rest: 150,
     feel: 'Bíceps de cada braço.',
     setup: 'Braços ao lado do corpo, cotovelos fixos.',
     exec: 'Suba girando levemente o punho e desça controlando.',
@@ -344,7 +346,7 @@ export const EXERCISES = [
   }),
   E('rosca-martelo', 'Rosca Martelo', {
     primary: 'biceps', secondary: ['antebraco'], pattern: 'biceps', type: 'isolado',
-    equip: 'halter', slug: 'hammer-curl', reps: [10, 15], rest: 75,
+    equip: 'halter', slug: 'hammer-curl', reps: [10, 15], rest: 150,
     feel: 'Bíceps e antebraço (braquial e braquiorradial).',
     setup: 'Pegada neutra, cotovelos junto ao corpo.',
     exec: 'Suba mantendo o punho neutro e desça controlando.',
@@ -352,7 +354,7 @@ export const EXERCISES = [
   }),
   E('rosca-inclinada', 'Rosca Inclinada com Halteres', {
     primary: 'biceps', pattern: 'biceps', type: 'isolado',
-    equip: 'halter', slug: 'incline-dumbbell-curl', reps: [10, 15], rest: 90,
+    equip: 'halter', slug: 'incline-dumbbell-curl', reps: [10, 15], rest: 150,
     feel: 'Bíceps com maior alongamento na parte de baixo.',
     setup: 'Banco a ~60º, braços pendendo livremente.',
     exec: 'Suba sem mover os ombros e desça até estender.',
@@ -360,7 +362,7 @@ export const EXERCISES = [
   }),
   E('rosca-cabo', 'Rosca no Cabo', {
     primary: 'biceps', pattern: 'biceps', type: 'isolado',
-    equip: 'cabo', slug: 'cable-curl', reps: [10, 15], rest: 75,
+    equip: 'cabo', slug: 'cable-curl', reps: [10, 15], rest: 150,
     feel: 'Bíceps com tensão constante.',
     setup: 'Polia baixa, cotovelos ao lado do corpo.',
     exec: 'Flexione até o topo e volte controlando.',
@@ -409,15 +411,15 @@ export const EXERCISES = [
     avoid: 'Inclinar demais o tronco à frente.'
   }),
   E('agachamento-livre-corporal', 'Agachamento com Peso Corporal', {
-    primary: 'quadriceps', secondary: ['gluteos'], pattern: 'quad_composto',
-    equip: 'livre', slug: 'bodyweight-squat', reps: [12, 20], rest: 90,
+    bw: 0.7, primary: 'quadriceps', secondary: ['gluteos'], pattern: 'quad_composto',
+    equip: 'livre', slug: 'bodyweight-squat', reps: [10, 15], rest: 120,
     feel: 'Quadríceps e glúteos.',
     setup: 'Pés na largura dos ombros, braços à frente para equilíbrio.',
     exec: 'Desça até o paralelo e suba controlando.',
     avoid: 'Levantar os calcanhares do chão.'
   }),
   E('bulgaro', 'Agachamento Búlgaro', {
-    primary: 'quadriceps', secondary: ['gluteos', 'abdutores'], pattern: 'quad_composto',
+    bw: 0.75, primary: 'quadriceps', secondary: ['gluteos', 'abdutores'], pattern: 'quad_composto',
     equip: 'halter', slug: 'bulgarian-split-squat', reps: [8, 12], rest: 150, level: 'intermediario',
     feel: 'Quadríceps e glúteo da perna da frente.',
     setup: 'Pé de trás no banco, tronco levemente inclinado para focar glúteo.',
@@ -425,7 +427,7 @@ export const EXERCISES = [
     avoid: 'Passo curto demais, que sobrecarrega o joelho.'
   }),
   E('afundo', 'Afundo / Passada', {
-    primary: 'quadriceps', secondary: ['gluteos'], pattern: 'quad_composto',
+    bw: 0.7, primary: 'quadriceps', secondary: ['gluteos'], pattern: 'quad_composto',
     equip: 'halter', slug: 'walking-lunge', reps: [10, 15], rest: 120,
     feel: 'Quadríceps e glúteos.',
     setup: 'Tronco ereto, passo firme.',
@@ -434,7 +436,7 @@ export const EXERCISES = [
   }),
   E('cadeira-extensora', 'Cadeira Extensora', {
     primary: 'quadriceps', pattern: 'quad_iso', type: 'isolado',
-    equip: 'maquina', slug: 'leg-extension', reps: [10, 15], rest: 90,
+    equip: 'maquina', slug: 'leg-extension', reps: [10, 15], rest: 150,
     feel: 'Quadríceps isolado, queimação na frente da coxa.',
     setup: 'Eixo da máquina alinhado ao joelho.',
     exec: 'Estenda até quase o fim e desça controlando.',
@@ -466,7 +468,7 @@ export const EXERCISES = [
   }),
   E('mesa-flexora', 'Mesa Flexora', {
     primary: 'isquiotibiais', pattern: 'posterior_iso', type: 'isolado',
-    equip: 'maquina', slug: 'lying-leg-curl', reps: [8, 12], rest: 90,
+    equip: 'maquina', slug: 'lying-leg-curl', reps: [8, 12], rest: 150,
     feel: 'Parte de trás da coxa.',
     setup: 'Quadril colado no apoio, eixo alinhado ao joelho.',
     exec: 'Flexione até o fim e controle a volta.',
@@ -474,14 +476,14 @@ export const EXERCISES = [
   }),
   E('cadeira-flexora', 'Cadeira Flexora', {
     primary: 'isquiotibiais', pattern: 'posterior_iso', type: 'isolado',
-    equip: 'maquina', slug: 'seated-leg-curl', reps: [10, 15], rest: 90,
+    equip: 'maquina', slug: 'seated-leg-curl', reps: [10, 15], rest: 150,
     feel: 'Posterior de coxa, com alongamento maior que na mesa flexora.',
     setup: 'Coxas travadas, costas apoiadas.',
     exec: 'Flexione os joelhos e volte controlando.',
     avoid: 'Tirar o quadril do assento.'
   }),
   E('flexora-nordica', 'Flexora Nórdica', {
-    primary: 'isquiotibiais', pattern: 'posterior_iso', type: 'isolado',
+    bw: 0.6, primary: 'isquiotibiais', pattern: 'posterior_iso', type: 'isolado',
     equip: 'livre', slug: 'nordic-hamstring-curl', reps: [5, 8], rest: 120, level: 'avancado',
     feel: 'Posterior de coxa em contração excêntrica intensa.',
     setup: 'Joelhos apoiados, tornozelos travados, corpo em linha.',
@@ -497,8 +499,8 @@ export const EXERCISES = [
     avoid: 'Hiperestender a lombar no topo.'
   }),
   E('elevacao-pelvica', 'Elevação Pélvica no Solo', {
-    primary: 'gluteos', secondary: ['isquiotibiais'], pattern: 'gluteo',
-    equip: 'livre', slug: 'glute-bridge', reps: [12, 20], rest: 90,
+    bw: 0.45, primary: 'gluteos', secondary: ['isquiotibiais'], pattern: 'gluteo',
+    equip: 'livre', slug: 'glute-bridge', reps: [10, 15], rest: 120,
     feel: 'Glúteos.',
     setup: 'Costas no chão, pés próximos ao quadril.',
     exec: 'Suba o quadril até alinhar tronco e coxas apertando o glúteo.',
@@ -506,7 +508,7 @@ export const EXERCISES = [
   }),
   E('cable-pull-through', 'Pull Through no Cabo', {
     primary: 'gluteos', secondary: ['isquiotibiais'], pattern: 'gluteo',
-    equip: 'cabo', slug: 'cable-pull-through', reps: [12, 15], rest: 90,
+    equip: 'cabo', slug: 'cable-pull-through', reps: [10, 14], rest: 120,
     feel: 'Glúteos e posterior, padrão de quadril sem carga na coluna.',
     setup: 'De costas para a polia baixa, corda entre as pernas.',
     exec: 'Empurre o quadril para trás e volte estendendo com o glúteo.',
@@ -514,7 +516,7 @@ export const EXERCISES = [
   }),
   E('abducao-maquina', 'Abdução de Quadril na Máquina', {
     primary: 'abdutores', secondary: ['gluteos'], pattern: 'abdutor', type: 'isolado',
-    equip: 'maquina', slug: 'hip-abduction-machine', reps: [12, 20], rest: 75,
+    equip: 'maquina', slug: 'hip-abduction-machine', reps: [10, 15], rest: 150,
     feel: 'Lateral do quadril (glúteo médio).',
     setup: 'Tronco levemente inclinado à frente para focar o glúteo médio.',
     exec: 'Abra as pernas contra a resistência e volte controlando.',
@@ -522,7 +524,7 @@ export const EXERCISES = [
   }),
   E('aducao-maquina', 'Adução de Quadril na Máquina', {
     primary: 'adutores', pattern: 'adutor', type: 'isolado',
-    equip: 'maquina', slug: 'hip-adduction-machine', reps: [12, 20], rest: 75,
+    equip: 'maquina', slug: 'hip-adduction-machine', reps: [10, 15], rest: 150,
     feel: 'Parte interna da coxa.',
     setup: 'Costas apoiadas, amplitude confortável.',
     exec: 'Feche as pernas e volte controlando o alongamento.',
@@ -530,7 +532,7 @@ export const EXERCISES = [
   }),
   E('panturrilha-em-pe', 'Panturrilha em Pé', {
     primary: 'panturrilhas', pattern: 'panturrilha', type: 'isolado',
-    equip: 'maquina', slug: 'standing-calf-raise', reps: [8, 12], rest: 90,
+    equip: 'maquina', slug: 'standing-calf-raise', reps: [8, 12], rest: 150,
     feel: 'Panturrilha (gastrocnêmio), alongando embaixo.',
     setup: 'Ponta dos pés na plataforma, joelhos quase estendidos.',
     exec: 'Desça o calcanhar até alongar e suba até o topo com pausa.',
@@ -538,15 +540,15 @@ export const EXERCISES = [
   }),
   E('panturrilha-sentado', 'Panturrilha Sentado', {
     primary: 'panturrilhas', pattern: 'panturrilha', type: 'isolado',
-    equip: 'maquina', slug: 'seated-calf-raise', reps: [12, 20], rest: 75,
+    equip: 'maquina', slug: 'seated-calf-raise', reps: [10, 15], rest: 150,
     feel: 'Panturrilha profunda (sóleo), com joelho flexionado.',
     setup: 'Joelhos a 90º sob o apoio.',
     exec: 'Suba até o topo e desça alongando.',
     avoid: 'Amplitude curta.'
   }),
   E('panturrilha-livre', 'Panturrilha em Pé sem Máquina', {
-    primary: 'panturrilhas', pattern: 'panturrilha', type: 'isolado',
-    equip: 'livre', slug: 'calf-raise', reps: [15, 25], rest: 60,
+    bw: 0.9, primary: 'panturrilhas', pattern: 'panturrilha', type: 'isolado',
+    equip: 'livre', slug: 'calf-raise', reps: [12, 18], rest: 120,
     feel: 'Panturrilha.',
     setup: 'De pé, ponta dos pés num degrau se possível.',
     exec: 'Suba até a ponta dos pés e desça alongando.',
@@ -556,7 +558,7 @@ export const EXERCISES = [
   /* ---------------- CORE E LOMBAR ---------------- */
   E('abdominal-polia', 'Abdominal na Polia Alta', {
     primary: 'core', pattern: 'core', type: 'isolado',
-    equip: 'cabo', slug: 'cable-crunch', reps: [10, 15], rest: 75,
+    equip: 'cabo', slug: 'cable-crunch', reps: [10, 15], rest: 150,
     feel: 'Reto abdominal encurtando.',
     setup: 'Ajoelhado de frente para a polia, corda ao lado da cabeça.',
     exec: 'Aproxime as costelas da pelve flexionando a coluna.',
@@ -564,15 +566,15 @@ export const EXERCISES = [
   }),
   E('prancha', 'Prancha', {
     primary: 'core', pattern: 'core', type: 'isolado',
-    equip: 'livre', slug: 'plank', reps: [30, 60], rest: 60,
+    equip: 'livre', slug: 'plank', reps: [30, 60], rest: 120,
     feel: 'Abdômen inteiro sustentando o tronco.',
     setup: 'Antebraços no chão, corpo em linha reta.',
     exec: 'Mantenha o tempo contraindo abdômen e glúteos (registre segundos no campo de reps).',
     avoid: 'Deixar o quadril cair.'
   }),
   E('elevacao-pernas', 'Elevação de Pernas Suspenso', {
-    primary: 'core', pattern: 'core', type: 'isolado',
-    equip: 'livre', slug: 'hanging-knee-raise', reps: [8, 15], rest: 75,
+    bw: 0.35, primary: 'core', pattern: 'core', type: 'isolado',
+    equip: 'livre', slug: 'hanging-knee-raise', reps: [8, 14], rest: 150,
     feel: 'Abdômen inferior.',
     setup: 'Pendurado na barra, ombros ativos.',
     exec: 'Leve os joelhos ao peito enrolando a pelve e desça controlando.',
@@ -580,7 +582,7 @@ export const EXERCISES = [
   }),
   E('abdominal-solo', 'Abdominal no Solo', {
     primary: 'core', pattern: 'core', type: 'isolado',
-    equip: 'livre', slug: 'crunch', reps: [12, 20], rest: 60,
+    equip: 'livre', slug: 'crunch', reps: [10, 15], rest: 120,
     feel: 'Reto abdominal.',
     setup: 'Costas no chão, joelhos flexionados.',
     exec: 'Enrole a coluna aproximando as costelas da pelve.',
@@ -588,7 +590,7 @@ export const EXERCISES = [
   }),
   E('pallof-press', 'Pallof Press', {
     primary: 'core', pattern: 'core', type: 'isolado',
-    equip: 'cabo', slug: 'pallof-press', reps: [10, 15], rest: 60,
+    equip: 'cabo', slug: 'pallof-press', reps: [10, 15], rest: 120,
     feel: 'Core resistindo à rotação.',
     setup: 'De lado para a polia, mãos no peito.',
     exec: 'Estenda os braços à frente sem deixar o tronco girar.',
@@ -596,7 +598,7 @@ export const EXERCISES = [
   }),
   E('extensao-lombar', 'Extensão Lombar (Banco Romano)', {
     primary: 'lombar', secondary: ['gluteos', 'isquiotibiais'], pattern: 'lombar', type: 'isolado',
-    equip: 'maquina', slug: 'back-extension', reps: [10, 15], rest: 90,
+    equip: 'maquina', slug: 'back-extension', reps: [10, 15], rest: 120,
     feel: 'Lombar e glúteos.',
     setup: 'Quadril na borda do apoio, coluna neutra.',
     exec: 'Desça controlando e suba até alinhar o tronco.',
@@ -604,7 +606,7 @@ export const EXERCISES = [
   }),
   E('bird-dog', 'Bird Dog', {
     primary: 'lombar', secondary: ['core', 'gluteos'], pattern: 'lombar', type: 'isolado',
-    equip: 'livre', slug: 'bird-dog', reps: [8, 12], rest: 60,
+    equip: 'livre', slug: 'bird-dog', reps: [8, 12], rest: 120,
     feel: 'Estabilizadores da coluna.',
     setup: 'Quatro apoios, coluna neutra.',
     exec: 'Estenda braço e perna opostos sem girar o quadril.',

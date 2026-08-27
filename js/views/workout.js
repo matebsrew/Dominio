@@ -3,7 +3,7 @@
 import { esc, today, weekdayIndex, WEEKDAYS_SHORT, num, toast, bars, weekStart, addDays } from '../core/util.js';
 import { pdata, saveCheckin, checkinFor, deleteCheckin, setProgram, activeProfile, setPain } from '../core/store.js';
 import { generateProgram, dayForWeekday, nextDay, weekMap, estimateMinutes } from '../engine/program.js';
-import { suggest, volumeReport } from '../engine/progression.js';
+import { suggest, volumeReport, plateauDiagnosis, frequencyPerMuscle } from '../engine/progression.js';
 import { QUESTIONS, score as readinessScore, sessionPlan, band } from '../engine/readiness.js';
 import { phase, setsThisWeek, deloadPrescription } from '../engine/mesocycle.js';
 import { estimateLoad, warmupFor } from '../engine/loading.js';
@@ -45,6 +45,7 @@ export function render({ profile, go, params }) {
   const pain = data.settings.pain || {};
   const painRegions = Object.keys(pain).filter(r => pain[r]);
   const warmup = warmupFor(day.name);
+  const bodyweight = data.body.find(b => Number.isFinite(b.weight))?.weight || profile.weightKg || 0;
 
   return {
     title: esc(day.name),
@@ -59,7 +60,7 @@ export function render({ profile, go, params }) {
             <div class="muted tiny">${day.exercises.length} exercícios · ~${day.estimatedMin || estimateMinutes(day.exercises)} min · RIR-alvo ${esc(ph.rir.label)}</div></div>
         </div>
         ${isDeload ? coach('Protocolo de hoje', deloadPrescription(data.settings).text, 'violet') : ''}
-        ${day.exercises.map(ex => previewExercise(ex, data, plan, ph, profile, pain)).join('')}
+        ${day.exercises.map(ex => previewExercise(ex, data, plan, ph, profile, pain, bodyweight)).join('')}
         <button class="primary block mt" data-iniciar>${trainedToday ? 'Abrir sessão novamente' : 'Iniciar treino'}</button>
       </div>
 
@@ -169,9 +170,9 @@ function checkinDone(checkin, plan) {
   </div>`;
 }
 
-function previewExercise(ex, data, plan, ph, profile, pain) {
+function previewExercise(ex, data, plan, ph, profile, pain, bodyweight) {
   const meta = BY_ID[ex.id] || ex;
-  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload });
+  const s = suggest({ ...meta, reps: ex.reps }, data.sessions, { readiness: plan.score, deload: ph.isDeload, bodyweight });
   const bias = data.settings.volumeBias?.[ex.primary] || 0;
   const planned = setsThisWeek(ex.sets, ph, bias);
   const sets = Math.max(1, Math.round(planned * (plan.volumeFactor ?? 1)));
@@ -188,11 +189,29 @@ function previewExercise(ex, data, plan, ph, profile, pain) {
         : estimate && !estimate.bodyweight ? `<span class="pill">${estimate.kg} kg${estimate.perSide ? '/lado' : ''}</span>` : ''}
     </div>
     <div class="muted tiny mt">${esc(s.headline)}</div>
+    ${s.overloadLabel ? `<div class="overload ${s.overloadLabel.tone}">${esc(s.overloadLabel.text)}</div>` : ''}
+    ${s.plateau ? plateauCard(ex, data, profile) : ''}
     ${estimate ? `<div class="dim tiny mt">${esc(estimate.text)} ${esc(estimate.caveat || '')}</div>` : ''}
     ${conflicts.length ? `<div class="tiny mt" style="color:var(--warn)">⚠ Passa pelo ${conflicts.map(c => REGIONS[c].toLowerCase()).join(' e ')} que você marcou como dolorido — troque na sessão.</div>` : ''}
     <button class="link" data-toggle-guide="${esc(ex.id)}">📘 Como executar</button>
     ${guideHtml(ex.id)}
   </div>`;
+}
+
+function plateauCard(ex, data, profile) {
+  const passos = plateauDiagnosis(ex.name, {
+    sessions: data.sessions, checkins: data.checkins, body: data.body,
+    volumeReport: volumeReport(data.sessions, profile, weekStart(), BY_ID), profile
+  });
+  const primeiro = passos.find(p => p.suspeito) || passos[passos.length - 1];
+  return `<details class="plateau">
+    <summary>Carga travada — ver o que investigar</summary>
+    ${passos.map(p => `<div class="plateau-step ${p.suspeito ? 'on' : ''}">
+      <span class="plateau-n">${p.ordem}</span>
+      <div><b>${esc(p.titulo)}</b><div class="dim tiny">${esc(p.texto)}</div></div>
+    </div>`).join('')}
+    <p class="dim tiny" style="margin:10px 0 0">Comece pelo passo ${primeiro.ordem}. Mudar o programa antes de checar os anteriores costuma só trocar um problema por outro.</p>
+  </details>`;
 }
 
 function painCard(regions, day, profile) {

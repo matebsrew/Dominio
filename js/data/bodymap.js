@@ -169,6 +169,67 @@ const BACK = {
 
 const REGIONS = { [VIEW.FRENTE]: FRONT, [VIEW.COSTAS]: BACK };
 
+// Ponto de onde sai a linha de chamada de cada rótulo.
+const ANCHOR = {
+  peito: [44, 58], ombro_ant: [34, 48], ombro_lat: [28, 58],
+  biceps: [29, 72], antebraco: [28, 110], core: [60, 92],
+  quadriceps: [46, 160], adutores: [60, 158],
+  trapezio: [60, 50], dorsais: [46, 80], ombro_post: [31, 52],
+  triceps: [28, 70], lombar: [60, 106], gluteos: [48, 130],
+  abdutores: [37, 128], isquiotibiais: [46, 168], panturrilhas: [46, 214]
+};
+
+// Nomes curtos o bastante para caber na margem da prancha.
+const NOME = {
+  peito: 'Peitoral', dorsais: 'Grande dorsal', trapezio: 'Trapézio',
+  ombro_ant: 'Deltoide ant.', ombro_lat: 'Deltoide lat.', ombro_post: 'Deltoide post.',
+  biceps: 'Bíceps', triceps: 'Tríceps', antebraco: 'Antebraço',
+  quadriceps: 'Quadríceps', isquiotibiais: 'Isquiotibiais', gluteos: 'Glúteo máx.',
+  abdutores: 'Glúteo méd.', adutores: 'Adutores', panturrilhas: 'Panturrilha',
+  core: 'Reto abdominal', lombar: 'Eretores'
+};
+
+// Nome por extenso, para a legenda abaixo da prancha.
+const NOME_LONGO = {
+  ombro_ant: 'Deltoide anterior', ombro_lat: 'Deltoide lateral', ombro_post: 'Deltoide posterior',
+  gluteos: 'Glúteo máximo', abdutores: 'Glúteo médio', lombar: 'Eretores da espinha'
+};
+
+export const muscleAnatomicalName = key => NOME_LONGO[key] || NOME[key] || key;
+
+/** Só entram na prancha os secundários que aparecem na mesma vista do primário. */
+export function visibleSecondary(primary, secondary = []) {
+  const view = MUSCLE_VIEW[primary] || VIEW.FRENTE;
+  return secondary.filter(k => (MUSCLE_VIEW[k] || VIEW.FRENTE) === view && REGIONS[view][k]);
+}
+
+function callout(key, side, tone, ty) {
+  const a = ANCHOR[key];
+  if (!a) return '';
+  const [x, y] = a;
+  const endX = side === 'esq' ? -8 : 128;
+  const textX = side === 'esq' ? -13 : 133;
+  return `<g class="callout">
+    <circle cx="${x}" cy="${y}" r="2" fill="${tone}"/>
+    <path d="M${x},${y} L${side === 'esq' ? x - 14 : x + 14},${ty} L${endX},${ty}" fill="none"
+          stroke="${tone}" stroke-width="0.8" opacity="0.6"/>
+    <text x="${textX}" y="${ty + 3.4}" text-anchor="${side === 'esq' ? 'end' : 'start'}"
+          fill="${tone}" font-size="9.5" opacity="0.95">${NOME[key] || key}</text>
+  </g>`;
+}
+
+// Mantém os rótulos na altura do músculo, afastando só o necessário para não colidirem.
+function empilhar(itens) {
+  const MIN = 19;
+  const ordenados = itens.slice().sort((a, b) => a.y - b.y);
+  let anterior = -Infinity;
+  return ordenados.map(item => {
+    const ty = Math.max(item.y, anterior + MIN, 16);
+    anterior = ty;
+    return { ...item, ty: Math.min(ty, 252) };
+  });
+}
+
 /**
  * Corpo com o músculo-alvo aceso.
  * tone = cor do destaque; base = cor da silhueta.
@@ -176,21 +237,47 @@ const REGIONS = { [VIEW.FRENTE]: FRONT, [VIEW.COSTAS]: BACK };
 export function bodySvg(muscleKey, opts = {}) {
   const {
     tone = 'var(--brass)',
+    toneSecondary = 'var(--steel)',
     base = 'currentColor',
     baseOpacity = 0.16,
     lineOpacity = 0.3,
-    className = 'anat'
+    className = 'anat',
+    secondary = [],
+    labels = false
   } = opts;
 
   const view = MUSCLE_VIEW[muscleKey] || VIEW.FRENTE;
   const region = REGIONS[view][muscleKey] || '';
   const label = view === VIEW.COSTAS ? 'costas' : 'frente';
+  const sec = labels ? visibleSecondary(muscleKey, secondary) : [];
 
-  return `<svg class="${className}" viewBox="0 0 120 264" role="img" aria-label="Corpo humano, vista de ${label}, com o músculo-alvo destacado">
+  // Com rótulos a prancha precisa de margem lateral para o texto.
+  const box = labels ? '-112 0 344 268' : '0 0 120 268';
+
+  const pintar = (key, cor, op) => {
+    const d = REGIONS[view][key];
+    if (!d) return '';
+    return `<g fill="${cor}" opacity="${op}">${d}</g>
+            <g fill="none" stroke="${cor}" stroke-width="0.8" opacity="${op * 0.55}">${d}</g>`;
+  };
+
+  let chamadas = '';
+  if (labels) {
+    // O alvo fica à esquerda; os auxiliares à direita. Equilibra a prancha.
+    const esq = [{ key: muscleKey, cor: tone, y: ANCHOR[muscleKey]?.[1] ?? 60 }];
+    const dir = sec.map(k => ({ key: k, cor: toneSecondary, y: ANCHOR[k]?.[1] ?? 60 }));
+    chamadas = [
+      ...empilhar(esq).map(m => callout(m.key, 'esq', m.cor, m.ty)),
+      ...empilhar(dir).map(m => callout(m.key, 'dir', m.cor, m.ty))
+    ].join('');
+  }
+
+  return `<svg class="${className}" viewBox="${box}" role="img" aria-label="Corpo humano, vista de ${label}, com o músculo-alvo destacado">
     <g fill="${base}" opacity="${baseOpacity}">${SILHOUETTE}</g>
     <g fill="none" stroke="${base}" stroke-width="1" opacity="${lineOpacity}">${SILHOUETTE}</g>
-    ${region ? `<g fill="${tone}" opacity="0.92">${region}</g>
-                <g fill="none" stroke="${tone}" stroke-width="0.8" opacity="0.5">${region}</g>` : ''}
+    ${sec.map(k => pintar(k, toneSecondary, 0.55)).join('')}
+    ${pintar(muscleKey, tone, 0.92)}
+    ${chamadas}
   </svg>`;
 }
 

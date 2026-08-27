@@ -5,6 +5,7 @@
 // relação entre simplicidade e resultado para quem treina sem supervisão direta.
 
 import { MUSCLES, MUSCLE_ORDER, landmarks, INDIRECT_FACTOR } from '../data/muscles.js';
+import { sessionOverload, describeOverload, repsForOverload, effectiveLoad } from './overload.js';
 import { weekStart, weekDays, mean, clamp, round, today, daysBetween } from '../core/util.js';
 
 /* ---------- Métricas de série ---------- */
@@ -53,8 +54,13 @@ export function historyFor(sessions, exerciseName) {
  * Sugestão para a sessão de hoje.
  * readiness: 0–100 (prontidão do check-in); deload: true força semana leve.
  */
-export function suggest(exercise, sessions, { readiness = null, deload = false } = {}) {
+export function suggest(exercise, sessions, { readiness = null, deload = false, bodyweight = 0 } = {}) {
   const history = historyFor(sessions, exercise.name);
+  const ctx = { exercise, oldBodyweight: bodyweight, newBodyweight: bodyweight };
+  // Quanto a última sessão rendeu sobre a anterior, em porcentagem real.
+  const lastOverload = history.length >= 2
+    ? sessionOverload(history[1].sets, history[0].sets, ctx)
+    : null;
   const [min, max] = exercise.reps;
   const last = history[0];
 
@@ -155,10 +161,23 @@ export function suggest(exercise, sessions, { readiness = null, deload = false }
   }
 
   if (stalled && out.kind !== 'subir') {
-    out.warning = 'Sem ganho de força nas últimas 3 sessões neste exercício. Se repetir, vale revisar execução, aumentar o descanso, ou trocar por uma variação equivalente.';
+    out.warning = 'Sem ganho de força nas últimas 3 sessões neste exercício.';
+    out.plateau = true;
   }
 
-  return { ...out, history, last };
+  // Meta de repetições para a carga sugerida render ~2% de sobrecarga.
+  const repsTarget = out.suggestedKg && last
+    ? repsForOverload(last.sets[0], { kg: out.suggestedKg, rir: 1 }, 2, ctx)
+    : null;
+
+  return {
+    ...out,
+    history,
+    last,
+    overload: lastOverload,
+    overloadLabel: describeOverload(lastOverload),
+    repsTarget: repsTarget && repsTarget >= min && repsTarget <= max ? repsTarget : null
+  };
 }
 
 export function describeSets(sets = []) {
@@ -256,6 +275,72 @@ export function performanceDrops(sessions) {
 }
 
 /* ---------- Recordes ---------- */
+
+/**
+ * Quando a carga trava, a causa quase nunca é o programa.
+ * Ordem de investigação do BuffBook (6.7): recuperação, depois o exercício,
+ * depois o volume — e só então reduzir.
+ */
+export function plateauDiagnosis(exerciseName, { sessions, checkins, body, volumeReport: report, profile }) {
+  const passos = [];
+
+  const sono = mean(checkins.slice(0, 7).map(c => c.sleepHours));
+  const prontidao = mean(checkins.slice(0, 7).map(c => c.score));
+  const recuperacaoRuim = (Number.isFinite(sono) && sono < 7) || (Number.isFinite(prontidao) && prontidao < 60);
+  passos.push({
+    ordem: 1, area: 'Recuperação', suspeito: recuperacaoRuim,
+    titulo: recuperacaoRuim ? 'Comece por aqui: você não está recuperando' : 'Recuperação parece em ordem',
+    texto: recuperacaoRuim
+      ? `Sono médio de ${Number.isFinite(sono) ? sono.toFixed(1) + 'h' : '—'} e prontidão de ${Number.isFinite(prontidao) ? Math.round(prontidao) : '—'}/100. É a causa mais comum de carga travada, e nenhuma mudança de programa resolve isso.`
+      : 'Sono e prontidão estão em faixa razoável, então o problema provavelmente não é recuperação.'
+  });
+
+  const h = historyFor(sessions, exerciseName);
+  const cargas = h.slice(0, 4).map(x => Math.max(...x.sets.map(s => s.kg || 0)));
+  const mesmaCarga = cargas.length >= 3 && new Set(cargas).size === 1;
+  passos.push({
+    ordem: 2, area: 'Exercício', suspeito: mesmaCarga,
+    titulo: mesmaCarga ? 'O exercício pode ter esgotado a inclinação' : 'O exercício ainda aceita carga',
+    texto: mesmaCarga
+      ? 'A mesma carga há várias sessões costuma significar que este movimento chegou ao limite prático do incremento disponível. Trocar por uma variação equivalente devolve uma rampa nova de progressão.'
+      : 'A carga ainda vem variando, então o movimento continua utilizável.'
+  });
+
+  const acima = (report || []).filter(r => r.value >= r.mrv && r.mrv > 0);
+  passos.push({
+    ordem: 3, area: 'Volume', suspeito: acima.length > 0,
+    titulo: acima.length ? `Volume alto demais em ${acima.map(r => r.label.toLowerCase()).join(', ')}` : 'Volume dentro da faixa',
+    texto: acima.length
+      ? 'Com articulações incomodando e desempenho caindo, corte 20 a 30% das séries por uma semana e veja se a força volta.'
+      : 'O volume semanal não está acima do que você recupera.'
+  });
+
+  passos.push({
+    ordem: 4, area: 'Redução reativa', suspeito: passos.slice(0, 3).every(p => !p.suspeito),
+    titulo: 'Só depois disso, reduza',
+    texto: 'Se sono, exercício e volume estiverem todos em ordem e a carga ainda não subir, aí sim vale uma semana de volume reduzido. Um platô de algumas semanas que depois quebra é normal — é o corpo consolidando adaptação, não uma crise.'
+  });
+
+  return passos;
+}
+
+/** Quantas vezes cada músculo foi treinado na semana. */
+export function frequencyPerMuscle(sessions, weekStartKey = weekStart(), exerciseIndex = null) {
+  const days = new Set(weekDays(weekStartKey));
+  const porMusculo = {};
+  for (const s of sessions) {
+    if (!days.has(s.date)) continue;
+    const noDia = new Set();
+    for (const ex of s.exercises || []) {
+      const meta = exerciseIndex?.[ex.id] || null;
+      const primary = meta?.primary || ex.primary;
+      const feitas = (ex.sets || []).filter(x => Number.isFinite(x.reps) && x.reps > 0).length;
+      if (primary && feitas) noDia.add(primary);
+    }
+    for (const m of noDia) porMusculo[m] = (porMusculo[m] || 0) + 1;
+  }
+  return porMusculo;
+}
 
 export function personalRecords(sessions) {
   const map = new Map();

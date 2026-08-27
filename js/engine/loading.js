@@ -98,11 +98,13 @@ export function warmupSets(exerciseId, workingKg, profile) {
   if (!ex || !Number.isFinite(workingKg) || workingKg <= 0) return [];
   const heavy = ex.type === 'composto' && ex.reps[0] <= 8;
 
+  // Rampa do BuffBook (5.6): grava o padrão, recruta unidades motoras e
+  // prepara o sistema nervoso — sem cansar. Isolados precisam de uma série só.
   const scheme = heavy
-    ? [[0.4, 8], [0.6, 5], [0.8, 3]]
+    ? [[0.5, 5], [0.8, 3], [0.9, 1]]
     : ex.type === 'composto'
-      ? [[0.5, 8], [0.75, 4]]
-      : [[0.5, 10]];
+      ? [[0.5, 5], [0.8, 3]]
+      : [[0.5, 8]];
 
   return scheme.map(([pct, reps]) => ({
     kg: Math.max(ex.equip === 'halter' ? 1 : 2.5, round(workingKg * pct, ex.equip === 'halter' ? 1 : 2.5)),

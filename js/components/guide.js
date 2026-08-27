@@ -4,7 +4,7 @@
 import { esc } from '../core/util.js';
 import { BY_ID, movementFrames, alternatives } from '../data/exercises.js';
 import { muscleLabel } from '../data/muscles.js';
-import { bodySvg, viewLabel } from '../data/bodymap.js';
+import { bodySvg, viewLabel, visibleSecondary, muscleAnatomicalName } from '../data/bodymap.js';
 
 const FASES = ['INÍCIO', 'MEIO', 'FINAL'];
 
@@ -32,11 +32,16 @@ export function guideHtml(exerciseId) {
     <div class="frames">${quadros}</div>
 
     <div class="guide-atlas">
-      <div class="atlas-fig">${bodySvg(ex.primary)}</div>
+      <div class="atlas-fig">${bodySvg(ex.primary, { secondary: ex.secondary || [], labels: true })}</div>
       <div class="atlas-info">
         <span class="guide-eyebrow">Onde sentir</span>
-        <b>${esc(alvo)}</b>
         <p>${esc(ex.feel)}</p>
+        <div class="atlas-legend">
+          <span><i class="dot primary"></i>${esc(muscleAnatomicalName(ex.primary))} — alvo</span>
+          ${visibleSecondary(ex.primary, ex.secondary || []).length
+            ? `<span><i class="dot secondary"></i>${visibleSecondary(ex.primary, ex.secondary || []).map(muscleAnatomicalName).join(', ')} — auxiliam</span>`
+            : ''}
+        </div>
       </div>
     </div>
 
